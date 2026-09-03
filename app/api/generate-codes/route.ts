@@ -1,0 +1,83 @@
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+// Configuración de Supabase para el servidor
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+// Función para generar un código aleatorio formato XXXX-XXXX-XXXX
+const generateRandomCode = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 4; j++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    if (i < 2) code += '-';
+  }
+  return code;
+};
+
+export async function POST(request: Request) {
+  try {
+    const { artistId, quantity } = await request.json();
+
+    if (!artistId || !quantity || quantity < 1) {
+      return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 });
+    }
+
+    // Límite de seguridad por petición para no colgar el servidor
+    const MAX_BATCH = 1000; 
+    const safeQuantity = Math.min(quantity, MAX_BATCH);
+
+    const generatedCodes = [];
+    let attempts = 0;
+    const maxAttempts = safeQuantity * 3; // Intentos máximos para evitar bucles infinitos
+
+    while (generatedCodes.length < safeQuantity && attempts < maxAttempts) {
+      const newCode = generateRandomCode();
+      
+      // Verificar que el código no exista ya en la base de datos
+      const { data: existingCode } = await supabase
+        .from('access_codes')
+        .select('id')
+        .eq('code', newCode)
+        .single();
+
+      if (!existingCode) {
+        // Si no existe, lo insertamos
+        const { error } = await supabase
+          .from('access_codes')
+          .insert({
+            code: newCode,
+            artist_id: artistId,
+            is_active: true
+          });
+
+        if (!error) {
+          generatedCodes.push(newCode);
+        }
+      }
+      attempts++;
+    }
+
+    if (generatedCodes.length < safeQuantity) {
+      return NextResponse.json({ 
+        error: 'No se pudieron generar todos los códigos. Intenta de nuevo.', 
+        generated: generatedCodes.length 
+      }, { status: 500 });
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      codes: generatedCodes,
+      message: `Se generaron ${generatedCodes.length} códigos exitosamente.` 
+    });
+
+  } catch (error) {
+    console.error('Error en generate-codes API:', error);
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+  }
+}
