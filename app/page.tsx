@@ -3,8 +3,11 @@ export const revalidate = 0;
 import { getAllArtists } from '@/lib/artists';
 import Link from 'next/link';
 
-export default function Home() {
-  const allArtists = getAllArtists();
+// 1. AGREGAMOS 'async' AQUÍ 👇
+export default async function Home() {
+  
+  // 2. AGREGAMOS 'await' AQUÍ 👇
+  const allArtists = await getAllArtists();
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -45,7 +48,7 @@ export default function Home() {
             <p className="text-zinc-400">Te entregamos chips listos para pegar en tu mercancía, tarjetas o poster.</p>
           </div>
           <div className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800">
-            <div className="text-4xl mb-4"></div>
+            <div className="text-4xl mb-4">🔒</div>
             <h3 className="text-xl font-bold mb-2">Contenido VIP</h3>
             <p className="text-zinc-400">Sistema de seguridad por token. Solo tus fans con chip pueden descargar.</p>
           </div>
