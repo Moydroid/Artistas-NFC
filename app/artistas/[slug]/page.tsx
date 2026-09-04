@@ -1,50 +1,30 @@
 export const dynamic = 'force-dynamic';
 import { supabase } from '@/lib/supabase';
+import Image from 'next/image';
 import Link from 'next/link';
 
 export default async function ArtistPage({ params }: { params: Promise<{ slug: string }> }) {
-  // Esperar los params (Next.js 15+ los retorna como Promise)
   const { slug } = await params;
   
-  console.log('🔍 Buscando slug:', slug);
-
-  // Obtener el artista SIN usar .single()
-  const { data: artists, error } = await supabase
+  const { data: artists } = await supabase
     .from('artists')
     .select('*')
     .eq('slug', slug)
     .limit(1);
 
-  if (error || !artists || artists.length === 0) {
-    console.error('❌ Error al obtener artista:', error);
-    
+  if (!artists || artists.length === 0) {
     return (
       <main className="min-h-screen bg-black text-white flex items-center justify-center p-8">
-        <div className="text-center max-w-2xl">
+        <div className="text-center">
           <h1 className="text-3xl font-bold mb-4 text-red-500">Artista no encontrado</h1>
-          <p className="text-zinc-400 mb-4">Slug buscado: <span className="text-white font-mono">{slug}</span></p>
-          <p className="text-zinc-400 mb-6">Error: {error?.message || 'No se encontró el artista'}</p>
-          
-          <div className="bg-zinc-900 p-6 rounded-xl mb-6 text-left">
-            <h3 className="text-purple-400 font-bold mb-3">Artistas disponibles:</h3>
-            <ul className="text-zinc-400 space-y-1">
-              <li><Link href="/artistas/ged" className="text-blue-400 hover:underline">ged</Link></li>
-              <li><Link href="/artistas/herencias" className="text-blue-400 hover:underline">herencias</Link></li>
-              <li><Link href="/artistas/pinpon" className="text-blue-400 hover:underline">pinpon</Link></li>
-              <li><Link href="/artistas/yo-mero" className="text-blue-400 hover:underline">yo-mero</Link></li>
-            </ul>
-          </div>
-          
           <Link href="/" className="text-purple-400 underline">Volver al inicio</Link>
         </div>
       </main>
     );
   }
 
-  // Tomar el primer artista del array
   const artist = artists[0];
 
-  // Obtener las canciones del artista
   const { data: tracks } = await supabase
     .from('tracks')
     .select('*')
@@ -55,27 +35,53 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
       <div className="max-w-3xl mx-auto">
         <Link href="/" className="text-purple-400 mb-6 inline-block">← Volver al inicio</Link>
         
-        <div className="bg-gradient-to-r from-purple-900 to-pink-900 p-8 rounded-2xl mb-8">
-          <h1 className="text-5xl font-bold">{artist.name}</h1>
-          <p className="text-purple-200 mt-2">Slug: {artist.slug}</p>
+        {/* PORTADA DEL ARTISTA */}
+        <div className="w-full h-64 rounded-2xl mb-8 overflow-hidden relative">
+          {artist.cover ? (
+            <img 
+              src={artist.cover} 
+              alt={artist.name} 
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-r from-purple-900 to-pink-900 flex items-center justify-center">
+              <h1 className="text-5xl font-bold text-center px-4">{artist.name}</h1>
+            </div>
+          )}
         </div>
 
+        {/* NOMBRE Y BIO */}
+        <h1 className="text-4xl font-bold mb-4">{artist.name}</h1>
         {artist.short_bio && artist.short_bio !== 'EMPTY' && (
           <p className="text-zinc-400 text-xl mb-8">{artist.short_bio}</p>
         )}
         
+        {/* REPRODUCTOR */}
         <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
-          <h2 className="text-2xl font-bold mb-4 text-purple-400">Canciones ({tracks?.length || 0})</h2>
+          <h2 className="text-2xl font-bold mb-6 text-purple-400">Canciones ({tracks?.length || 0})</h2>
           {tracks && tracks.length > 0 ? (
             tracks.map((track: any) => (
               <div key={track.id} className="mb-6 border-b border-zinc-800 pb-4 last:border-0">
-                <p className="font-bold text-lg mb-2">{track.title}</p>
-                <p className="text-zinc-500 text-sm">ID: {track.id}</p>
-                <p className="text-zinc-500 text-sm">Artist ID: {track.artist_id}</p>
+                <p className="font-bold text-lg mb-3">{track.title}</p>
+                
+                {/* REPRODUCTOR DE AUDIO */}
+                {track.url ? (
+                  <audio 
+                    controls 
+                    className="w-full"
+                    src={track.url}
+                  >
+                    Tu navegador no soporta el elemento de audio.
+                  </audio>
+                ) : (
+                  <div className="bg-zinc-800 p-3 rounded-lg text-center text-zinc-500 text-sm">
+                    🎵 Agrega la URL del audio en Supabase
+                  </div>
+                )}
               </div>
             ))
           ) : (
-            <p className="text-zinc-500">No hay canciones registradas para este artista.</p>
+            <p className="text-zinc-500">No hay canciones registradas.</p>
           )}
         </div>
       </div>
