@@ -1,4 +1,4 @@
-﻿export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic';
 import { supabase, fixUrl } from '@/lib/supabase';
 import Link from 'next/link';
 
@@ -25,7 +25,7 @@ export default async function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {artists?.map((artist: any) => {
             const coverSrc = fixUrl(artist.cover_url);
-            const artistSlug = artist.babosa || '';
+            const artistSlug = artist.slug || '';
             return (
               <Link 
                 href={`/artistas/${artistSlug}`}
@@ -34,12 +34,11 @@ export default async function Home() {
               >
                 <div className="w-full h-48 bg-gradient-to-r from-purple-900 to-pink-900 relative overflow-hidden">
                   {coverSrc && (
-                    <img src={coverSrc} alt={artist.nombre || 'Artista'} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                    <img src={coverSrc} alt={artist.name || 'Artista'} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                   )}
                 </div>
                 <div className="p-6">
-                  <h3 className="text-2xl font-bold">{artist.nombre || 'Sin nombre'}</h3>
-                  <p className="text-zinc-400 text-xs mt-2">Slug: {artistSlug}</p>
+                  <h3 className="text-2xl font-bold">{artist.name || 'Sin nombre'}</h3>
                   <p className="text-zinc-400 mt-2 line-clamp-2">{artist.short_bio || 'Sin biografía'}</p>
                   <div className="mt-4 text-purple-400 text-sm font-bold">Ver perfil →</div>
                 </div>
