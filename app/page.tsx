@@ -13,7 +13,7 @@ export default async function Home() {
           const coverSrc = fixUrl(artist.cover_url);
           return (
             <Link 
-              href={`/artistas/${artist.babosa}`}
+              href={`/artistas/${artist.slug}`}
               key={artist.id} 
               className="bg-zinc-900 rounded-xl border border-zinc-800 hover:border-purple-500 transition overflow-hidden group"
             >
@@ -21,13 +21,13 @@ export default async function Home() {
                 {coverSrc && (
                   <img 
                     src={coverSrc} 
-                    alt={artist.nombre || 'Artista'} 
+                    alt={artist.name || 'Artista'} 
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                   />
                 )}
               </div>
               <div className="p-6">
-                <h2 className="text-2xl font-bold">{artist.nombre || 'Sin nombre'}</h2>
+                <h2 className="text-2xl font-bold">{artist.name || 'Sin nombre'}</h2>
                 <p className="text-zinc-400 mt-2 line-clamp-2">{artist.short_bio || 'Sin biografía'}</p>
                 <div className="mt-4 text-purple-400 text-sm font-bold">Ver perfil →</div>
               </div>
