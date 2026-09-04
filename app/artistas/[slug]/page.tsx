@@ -2,30 +2,31 @@ export const dynamic = 'force-dynamic';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
-export default async function ArtistPage({ params }: { params: { slug: string } }) {
-  // DEBUG: Mostrar qué slug estamos buscando
-  console.log('🔍 Buscando slug:', params.slug);
+export default async function ArtistPage({ params }: { params: Promise<{ slug: string }> }) {
+  // Esperar los params (Next.js 15+ los retorna como Promise)
+  const { slug } = await params;
+  
+  console.log('🔍 Buscando slug:', slug);
 
-  // Obtener el artista directamente (sin pasar por lib/artists.ts)
-  const { data: artist, error } = await supabase
+  // Obtener el artista SIN usar .single()
+  const { data: artists, error } = await supabase
     .from('artists')
     .select('*')
-    .eq('slug', params.slug)
-    .single();
+    .eq('slug', slug)
+    .limit(1);
 
-  if (error || !artist) {
+  if (error || !artists || artists.length === 0) {
     console.error('❌ Error al obtener artista:', error);
-    console.log('📋 Slugs disponibles en la DB: ged, herencias, gozalo, yo-mero, herencia-ss, pinpon');
     
     return (
       <main className="min-h-screen bg-black text-white flex items-center justify-center p-8">
         <div className="text-center max-w-2xl">
           <h1 className="text-3xl font-bold mb-4 text-red-500">Artista no encontrado</h1>
-          <p className="text-zinc-400 mb-4">Slug buscado: <span className="text-white font-mono">{params.slug}</span></p>
+          <p className="text-zinc-400 mb-4">Slug buscado: <span className="text-white font-mono">{slug}</span></p>
           <p className="text-zinc-400 mb-6">Error: {error?.message || 'No se encontró el artista'}</p>
           
           <div className="bg-zinc-900 p-6 rounded-xl mb-6 text-left">
-            <h3 className="text-purple-400 font-bold mb-3">Slugs disponibles:</h3>
+            <h3 className="text-purple-400 font-bold mb-3">Artistas disponibles:</h3>
             <ul className="text-zinc-400 space-y-1">
               <li><Link href="/artistas/ged" className="text-blue-400 hover:underline">ged</Link></li>
               <li><Link href="/artistas/herencias" className="text-blue-400 hover:underline">herencias</Link></li>
@@ -39,6 +40,9 @@ export default async function ArtistPage({ params }: { params: { slug: string } 
       </main>
     );
   }
+
+  // Tomar el primer artista del array
+  const artist = artists[0];
 
   // Obtener las canciones del artista
   const { data: tracks } = await supabase
