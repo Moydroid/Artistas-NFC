@@ -1,98 +1,35 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+export const dynamic = 'force-dynamic';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
-export default function NfcPage() {
-  const router = useRouter();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [artistSlug, setArtistSlug] = useState('');
-
-  useEffect(() => {
-    const validateAndRedirect = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-
-      if (!code) {
-        setStatus('error');
-        return;
-      }
-
-      const cleanCode = code.replace(/\s+/g, '').toUpperCase();
-
-      try {
-        // 1. Validar el código
-        const { data: codeData, error: codeError } = await supabase
-          .from('access_codes')
-          .select('*')
-          .eq('code', cleanCode)
-          .eq('is_active', true)
-          .single();
-
-        if (codeError || !codeData) {
-          setStatus('error');
-          return;
-        }
-
-        // 2. Obtener el artista
-        const { data: artistData } = await supabase
-          .from('artists')
-          .select('slug')
-          .eq('id', codeData.artist_id)
-          .single();
-
-        if (artistData) {
-          // 3. Guardar el pase VIP
-          localStorage.setItem('vip_access', 'true');
-          setArtistSlug(artistData.slug);
-          setStatus('success');
-          
-          // 4. Redirigir automáticamente después de 1 segundo
-          setTimeout(() => {
-            router.push(`/artistas/${artistData.slug}`);
-          }, 1000);
-        } else {
-          setStatus('error');
-        }
-      } catch (err) {
-        console.error('Error al validar:', err);
-        setStatus('error');
-      }
-    };
-
-    validateAndRedirect();
-  }, [router]);
-
-  if (status === 'loading') {
-    return (
-      <main className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4 animate-pulse">🔓</div>
-          <h1 className="text-2xl font-bold">Validando tu tarjeta...</h1>
-        </div>
-      </main>
-    );
-  }
-
-  if (status === 'success') {
-    return (
-      <main className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4 animate-bounce">✅</div>
-          <h1 className="text-2xl font-bold text-green-400">¡Acceso concedido!</h1>
-          <p className="text-zinc-400 mt-2">Redirigiendo a la música...</p>
-        </div>
-      </main>
-    );
-  }
+export default async function Home() {
+  // Usamos is_active para solo mostrar artistas activos
+  const { data: artists } = await supabase.from('artists').select('*').eq('is_active', true);
 
   return (
-    <main className="min-h-screen bg-black text-white flex items-center justify-center p-6">
-      <div className="text-center">
-        <div className="text-6xl mb-4">❌</div>
-        <h1 className="text-2xl font-bold text-red-400">Código inválido</h1>
-        <p className="text-zinc-400 mt-2">Este código no es válido o ya fue usado.</p>
+    <main className="min-h-screen bg-black text-white p-8">
+      <h1 className="text-4xl font-bold mb-8 text-center text-purple-400">Plataforma NFC - Artistas</h1>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        {artists?.map((artist: any) => (
+          <Link 
+            href={`/artistas/${artist.babosa}`} // ¡Usamos babosa en lugar de slug!
+            key={artist.id} 
+            className="bg-zinc-900 rounded-xl border border-zinc-800 hover:border-purple-500 transition overflow-hidden group"
+          >
+            {artist.cover_url ? (
+              <img src={artist.cover_url} alt={artist.nombre} className="w-full h-48 object-cover group-hover:scale-105 transition duration-500" />
+            ) : (
+              <div className="w-full h-48 bg-gradient-to-r from-purple-900 to-pink-900 flex items-center justify-center">
+                <span className="text-2xl font-bold">{artist.nombre}</span>
+              </div>
+            )}
+            <div className="p-6">
+              <h2 className="text-2xl font-bold">{artist.nombre}</h2>
+              <p className="text-zinc-400 mt-2 line-clamp-2">{artist.short_bio || 'Sin biografía'}</p>
+              <div className="mt-4 text-purple-400 text-sm font-bold">Ver perfil y escuchar →</div>
+            </div>
+          </Link>
+        ))}
       </div>
     </main>
   );
