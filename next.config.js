@@ -1,13 +1,12 @@
-/** @type {import('next').NextConfig} */
+﻿/** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ['@supabase/supabase-js'],
-  },
+  // Configuración limpia y moderna para Next.js 15/16
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**.supabase.co',
+        hostname: 'cdpzjslfbdaccotfzgim.supabase.co',
+        pathname: '/storage/v1/object/public/**',
       },
     ],
   },
