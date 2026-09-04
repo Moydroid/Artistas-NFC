@@ -3,12 +3,14 @@ import { supabase, fixUrl } from '@/lib/supabase';
 import Link from 'next/link';
 
 export default async function ArtistPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+  const resolvedParams = await params;
+  const slug = resolvedParams.slug;
 
+  // ¡AQUÍ ESTABA EL SECRETO! Usamos 'slug' y 'name'
   const { data: artists } = await supabase
     .from('artists')
     .select('*')
-    .eq('babosa', slug)
+    .eq('slug', slug)
     .limit(1);
 
   if (!artists || artists.length === 0) {
@@ -33,15 +35,15 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
 
         <div className="w-full h-64 rounded-2xl mb-8 overflow-hidden bg-zinc-900">
           {coverSrc ? (
-            <img src={coverSrc} alt={artist.nombre} className="w-full h-full object-cover" />
+            <img src={coverSrc} alt={artist.name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-purple-900 to-pink-900 flex items-center justify-center">
-              <h1 className="text-5xl font-bold">{artist.nombre}</h1>
+              <h1 className="text-5xl font-bold">{artist.name}</h1>
             </div>
           )}
         </div>
 
-        <h1 className="text-4xl font-bold mb-4">{artist.nombre}</h1>
+        <h1 className="text-4xl font-bold mb-4">{artist.name}</h1>
         {artist.short_bio && artist.short_bio !== 'EMPTY' && (
           <p className="text-zinc-400 text-lg mb-8">{artist.short_bio}</p>
         )}
@@ -53,7 +55,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
               const audioSrc = fixUrl(track.audio_url);
               return (
                 <div key={track.id} className="mb-6 border-b border-zinc-800 pb-4 last:border-0">
-                  <p className="font-bold text-lg mb-3">{track.titulo || track.title || 'Sin título'}</p>
+                  <p className="font-bold text-lg mb-3">{track.title || track.titulo || 'Sin título'}</p>
                   {audioSrc ? (
                     <audio controls className="w-full" src={audioSrc} />
                   ) : (
