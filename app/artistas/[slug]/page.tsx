@@ -1,15 +1,10 @@
 export const dynamic = 'force-dynamic';
-import { supabase } from '@/lib/supabase';
+import { supabase, fixUrl } from '@/lib/supabase';
 import Link from 'next/link';
 
-// Funci√≥n para corregir URLs mal escritas
-function fixSupabaseUrl(url: string | null) {
-  if (!url) return null;
-  return url.replace('subase.co', 'supabase.co');
-}
-
 export default async function ArtistPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+  const resolvedParams = await params;
+  const slug = resolvedParams.slug;
   
   const { data: artists } = await supabase
     .from('artists')
@@ -22,74 +17,62 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
       <main className="min-h-screen bg-black text-white flex items-center justify-center p-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold mb-4 text-red-500">Artista no encontrado</h1>
-          <Link href="/" className="text-purple-400 underline">Volver al inicio</Link>
+          <p className="text-zinc-400 mb-6">El slug "{slug}" no existe en la base de datos.</p>
+          <Link href="/" className="text-purple-400 underline font-bold">? Volver a FONOTAP</Link>
         </div>
       </main>
     );
   }
 
   const artist = artists[0];
-  const fixedCoverUrl = fixSupabaseUrl(artist.cover_url);
-
-  const { data: tracks } = await supabase
-    .from('tracks')
-    .select('*')
-    .eq('artist_id', artist.id);
+  const { data: tracks } = await supabase.from('tracks').select('*').eq('artist_id', artist.id);
+  const coverSrc = fixUrl(artist.cover_url);
 
   return (
     <main className="min-h-screen bg-black text-white p-8">
       <div className="max-w-3xl mx-auto">
-        <Link href="/" className="text-purple-400 mb-6 inline-block">‚Üê Volver al inicio</Link>
+        <Link href="/" className="text-purple-400 mb-6 inline-block font-bold">? Volver a FONOTAP</Link>
         
-        {/* PORTADA CON URL CORREGIDA */}
-        <div className="w-full h-64 rounded-2xl mb-8 overflow-hidden relative bg-zinc-900">
-          {fixedCoverUrl ? (
-            <img 
-              src={fixedCoverUrl} 
-              alt={artist.nombre} 
-              className="w-full h-full object-cover"
-            />
+        <div className="w-full h-64 md:h-80 rounded-2xl mb-8 overflow-hidden relative bg-zinc-900 shadow-2xl shadow-purple-900/20">
+          {coverSrc ? (
+            <img src={coverSrc} alt={artist.nombre} className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full bg-gradient-to-r from-purple-900 to-pink-900 flex items-center justify-center">
+            <div className="w-full h-full bg-gradient-to-br from-purple-900 to-pink-900 flex items-center justify-center">
               <h1 className="text-5xl font-bold text-center px-4">{artist.nombre}</h1>
             </div>
           )}
         </div>
 
-        <h1 className="text-4xl font-bold mb-4">{artist.nombre}</h1>
+        <h1 className="text-4xl md:text-5xl font-bold mb-4">{artist.nombre}</h1>
         {artist.short_bio && artist.short_bio !== 'EMPTY' && (
-          <p className="text-zinc-400 text-xl mb-8">{artist.short_bio}</p>
+          <p className="text-zinc-400 text-lg mb-8 leading-relaxed">{artist.short_bio}</p>
         )}
         
-        {/* REPRODUCTOR CON URL DE AUDIO CORREGIDA */}
-        <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
-          <h2 className="text-2xl font-bold mb-6 text-purple-400">Canciones ({tracks?.length || 0})</h2>
+        <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800 backdrop-blur-sm">
+          <h2 className="text-2xl font-bold mb-6 text-purple-400 flex items-center gap-2">
+            <span>??</span> Canciones ({tracks?.length || 0})
+          </h2>
+          
           {tracks && tracks.length > 0 ? (
             tracks.map((track: any) => {
-              const fixedAudioUrl = fixSupabaseUrl(track.audio_url);
-              
+              const audioSrc = fixUrl(track.audio_url);
               return (
-                <div key={track.id} className="mb-6 border-b border-zinc-800 pb-4 last:border-0">
-                  <p className="font-bold text-lg mb-3">{track.t√≠tulo}</p>
-                  
-                  {fixedAudioUrl ? (
-                    <audio 
-                      controls 
-                      className="w-full"
-                      src={fixedAudioUrl}
-                    >
+                <div key={track.id} className="mb-6 border-b border-zinc-800 pb-6 last:border-0 last:pb-0">
+                  <p className="font-bold text-lg mb-3 text-white">{track.tÌtulo || track.title || 'Sin tÌtulo'}</p>
+                  {audioSrc ? (
+                    <audio controls className="w-full rounded-lg" src={audioSrc}>
                       Tu navegador no soporta el elemento de audio.
                     </audio>
                   ) : (
-                    <div className="bg-zinc-800 p-3 rounded-lg text-center text-zinc-500 text-sm">
-                      üéµ No hay audio disponible
+                    <div className="bg-zinc-800 p-4 rounded-lg text-center text-zinc-500 text-sm border border-zinc-700">
+                       Audio no disponible (Falta URL en Supabase)
                     </div>
                   )}
                 </div>
               );
             })
           ) : (
-            <p className="text-zinc-500">No hay canciones registradas.</p>
+            <p className="text-zinc-500 text-center py-8">No hay canciones registradas para este artista a˙n.</p>
           )}
         </div>
       </div>
