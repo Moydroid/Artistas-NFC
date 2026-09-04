@@ -1,7 +1,12 @@
 export const dynamic = 'force-dynamic';
 import { supabase } from '@/lib/supabase';
-import Image from 'next/image';
 import Link from 'next/link';
+
+// Función para corregir URLs mal escritas
+function fixSupabaseUrl(url: string | null) {
+  if (!url) return null;
+  return url.replace('subase.co', 'supabase.co');
+}
 
 export default async function ArtistPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -9,7 +14,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
   const { data: artists } = await supabase
     .from('artists')
     .select('*')
-    .eq('slug', slug)
+    .eq('babosa', slug)
     .limit(1);
 
   if (!artists || artists.length === 0) {
@@ -24,6 +29,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
   }
 
   const artist = artists[0];
+  const fixedCoverUrl = fixSupabaseUrl(artist.cover_url);
 
   const { data: tracks } = await supabase
     .from('tracks')
@@ -35,51 +41,53 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
       <div className="max-w-3xl mx-auto">
         <Link href="/" className="text-purple-400 mb-6 inline-block">← Volver al inicio</Link>
         
-        {/* PORTADA DEL ARTISTA */}
-        <div className="w-full h-64 rounded-2xl mb-8 overflow-hidden relative">
-          {artist.cover ? (
+        {/* PORTADA CON URL CORREGIDA */}
+        <div className="w-full h-64 rounded-2xl mb-8 overflow-hidden relative bg-zinc-900">
+          {fixedCoverUrl ? (
             <img 
-              src={artist.cover} 
-              alt={artist.name} 
+              src={fixedCoverUrl} 
+              alt={artist.nombre} 
               className="w-full h-full object-cover"
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-r from-purple-900 to-pink-900 flex items-center justify-center">
-              <h1 className="text-5xl font-bold text-center px-4">{artist.name}</h1>
+              <h1 className="text-5xl font-bold text-center px-4">{artist.nombre}</h1>
             </div>
           )}
         </div>
 
-        {/* NOMBRE Y BIO */}
-        <h1 className="text-4xl font-bold mb-4">{artist.name}</h1>
+        <h1 className="text-4xl font-bold mb-4">{artist.nombre}</h1>
         {artist.short_bio && artist.short_bio !== 'EMPTY' && (
           <p className="text-zinc-400 text-xl mb-8">{artist.short_bio}</p>
         )}
         
-        {/* REPRODUCTOR */}
+        {/* REPRODUCTOR CON URL DE AUDIO CORREGIDA */}
         <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
           <h2 className="text-2xl font-bold mb-6 text-purple-400">Canciones ({tracks?.length || 0})</h2>
           {tracks && tracks.length > 0 ? (
-            tracks.map((track: any) => (
-              <div key={track.id} className="mb-6 border-b border-zinc-800 pb-4 last:border-0">
-                <p className="font-bold text-lg mb-3">{track.title}</p>
-                
-                {/* REPRODUCTOR DE AUDIO */}
-                {track.url ? (
-                  <audio 
-                    controls 
-                    className="w-full"
-                    src={track.url}
-                  >
-                    Tu navegador no soporta el elemento de audio.
-                  </audio>
-                ) : (
-                  <div className="bg-zinc-800 p-3 rounded-lg text-center text-zinc-500 text-sm">
-                    🎵 Agrega la URL del audio en Supabase
-                  </div>
-                )}
-              </div>
-            ))
+            tracks.map((track: any) => {
+              const fixedAudioUrl = fixSupabaseUrl(track.audio_url);
+              
+              return (
+                <div key={track.id} className="mb-6 border-b border-zinc-800 pb-4 last:border-0">
+                  <p className="font-bold text-lg mb-3">{track.título}</p>
+                  
+                  {fixedAudioUrl ? (
+                    <audio 
+                      controls 
+                      className="w-full"
+                      src={fixedAudioUrl}
+                    >
+                      Tu navegador no soporta el elemento de audio.
+                    </audio>
+                  ) : (
+                    <div className="bg-zinc-800 p-3 rounded-lg text-center text-zinc-500 text-sm">
+                      🎵 No hay audio disponible
+                    </div>
+                  )}
+                </div>
+              );
+            })
           ) : (
             <p className="text-zinc-500">No hay canciones registradas.</p>
           )}
