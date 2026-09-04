@@ -6,12 +6,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
   const resolvedParams = await params;
   const slug = resolvedParams.slug;
 
-  // ¡AQUÍ ESTABA EL SECRETO! Usamos 'slug' y 'name'
-  const { data: artists } = await supabase
-    .from('artists')
-    .select('*')
-    .eq('slug', slug)
-    .limit(1);
+  const { data: artists } = await supabase.from('artists').select('*').eq('slug', slug).limit(1);
 
   if (!artists || artists.length === 0) {
     return (
