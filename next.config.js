@@ -1,6 +1,5 @@
 ﻿/** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Configuración limpia y moderna para Next.js 15/16
   images: {
     remotePatterns: [
       {
@@ -11,5 +10,4 @@ const nextConfig = {
     ],
   },
 }
-
 module.exports = nextConfig

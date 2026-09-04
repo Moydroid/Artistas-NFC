@@ -7,7 +7,7 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-black text-white p-8">
-      <h1 className="text-4xl font-bold mb-8 text-center text-purple-400">Plataforma NFC - Artistas</h1>
+      <h1 className="text-4xl font-bold mb-8 text-center text-purple-400">FONOTAP - Plataforma NFC</h1>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
         {artists?.map((artist: any) => (
           <Link 
@@ -25,7 +25,7 @@ export default async function Home() {
               )}
             </div>
             <div className="p-6">
-              <h2 className="text-2xl font-bold">{artist.nombre}</h2>
+              <h2 className="text-2xl font-bold">{artist.nombre || 'Sin nombre'}</h2>
               <p className="text-zinc-400 mt-2 line-clamp-2">{artist.short_bio || 'Sin biografía'}</p>
               <div className="mt-4 text-purple-400 text-sm font-bold">Ver perfil →</div>
             </div>
