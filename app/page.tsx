@@ -8,6 +8,7 @@ export default function Home() {
   const [previewTrack, setPreviewTrack] = useState<any>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showScanModal, setShowScanModal] = useState(false); // Nuevo estado para el modal de escaneo
   const audioRef = useRef<HTMLAudioElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -46,7 +47,6 @@ export default function Home() {
     if (previewTrack && audioRef.current) {
       audioRef.current.play().catch(() => {});
       
-      // El timer sigue siendo de 30 segundos, pero el usuario no ve el número
       timerRef.current = setTimeout(() => {
         setIsPlaying(false);
         setShowModal(true);
@@ -73,7 +73,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a] text-white overflow-x-hidden">
+    <main className="min-h-screen bg-[#0a0a0a] text-white overflow-x-hidden relative">
       
       {/* Audio oculto para previews */}
       {previewTrack && (
@@ -257,7 +257,7 @@ export default function Home() {
         <p className="text-zinc-700 text-xs mt-2 tracking-widest uppercase">Conecta. Comparte. Crece.</p>
       </footer>
 
-      {/* MODAL DE MARKETING */}
+      {/* MODAL DE MARKETING (Preview) */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-purple-500/30 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center">
@@ -286,6 +286,70 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* BOTÓN FLOTANTE ESTRATÉGICO (Llamado a la acción sutil) */}
+      <button 
+        onClick={() => setShowScanModal(true)}
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-black/80 backdrop-blur-md border border-purple-500/40 text-white px-4 py-3 rounded-full shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:scale-105 transition-transform cursor-pointer"
+        style={{ animation: 'gentleBounce 3s ease-in-out infinite' }}
+      >
+        <span className="text-xl">📱</span>
+        <span className="text-xs sm:text-sm font-medium tracking-wide">
+          ¿Cómo uso mi tarjeta?
+        </span>
+      </button>
+
+      {/* MODAL EXPLICATIVO DE ESCANEO */}
+      {showScanModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm" onClick={() => setShowScanModal(false)}>
+          <div className="bg-zinc-900 border border-purple-500/30 rounded-3xl p-8 max-w-md w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowScanModal(false)} className="absolute top-4 right-4 text-zinc-400 hover:text-white text-2xl font-bold">&times;</button>
+            
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">💳</div>
+              <h3 className="text-2xl font-bold text-purple-400 mb-2">Tu música en sus manos</h3>
+              <p className="text-zinc-300 text-sm">Así es como tus fans desbloquean tu contenido exclusivo</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-black/40 p-4 rounded-xl border border-zinc-700">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl">📲</span>
+                  <h4 className="font-bold text-white">Opción 1: NFC (Recomendado)</h4>
+                </div>
+                <p className="text-sm text-zinc-400">Solo acerca tu celular a la tarjeta física. iPhone y Android la detectarán automáticamente y abrirán tu música.</p>
+              </div>
+
+              <div className="bg-black/40 p-4 rounded-xl border border-zinc-700">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl">📷</span>
+                  <h4 className="font-bold text-white">Opción 2: Código QR</h4>
+                </div>
+                <p className="text-sm text-zinc-400">Abre la cámara de tu celular, escanea el QR impreso en la tarjeta y listo. Se abrirá tu contenido al instante.</p>
+              </div>
+            </div>
+
+            <div className="mt-6 text-center">
+              <p className="text-xs text-zinc-500 mb-4">¿Aún no tienes tu tarjeta?</p>
+              <a 
+                href={whatsappUrl} 
+                target="_blank"
+                className="inline-block bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-xl font-bold text-sm hover:from-purple-500 hover:to-pink-500 transition-all"
+              >
+                💬 Quiero mis tarjetas FONOTAP
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Animación personalizada para el rebote suave */}
+      <style jsx>{`
+        @keyframes gentleBounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
+        }
+      `}</style>
     </main>
   );
 }
