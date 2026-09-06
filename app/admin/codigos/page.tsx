@@ -6,11 +6,11 @@ import { useRouter } from 'next/navigation';
 export default function AdminCodigos() {
   const router = useRouter();
   const [artists, setArtists] = useState<any[]>([]);
-  const [selectedArtistId, setSelectedArtistId] = useState('');
-  const [quantity, setQuantity] = useState(10);
+  const [selectedArtistId, setSelectedArtistId] = useState<string>('');
+  const [quantity, setQuantity] = useState<number>(10);
   const [codes, setCodes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [status, setStatus] = useState<string>('');
 
   useEffect(() => {
     fetchArtists();
@@ -18,7 +18,7 @@ export default function AdminCodigos() {
 
   const fetchArtists = async () => {
     const { data } = await supabase.from('artists').select('id, name, slug').order('name');
-    if (data) setArtists(data);
+    if (data) setArtists(data as any[]);
   };
 
   const generateCodes = async () => {
@@ -39,8 +39,8 @@ export default function AdminCodigos() {
       const artist = artists.find((a: any) => a.id === selectedArtistId);
       if (!artist) throw new Error('Artista no encontrado');
 
-      const newCodes = [];
-      const codesToInsert = [];
+      const newCodes: any[] = [];
+      const codesToInsert: any[] = [];
 
       for (let i = 0; i < quantity; i++) {
         const code = `FONO-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
@@ -121,10 +121,10 @@ export default function AdminCodigos() {
             disabled={loading}
             className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 py-4 rounded-xl font-bold text-lg transition-all"
           >
-            {loading ? '🚀 Generando...' : ' GENERAR CÓDIGOS'}
+            {loading ? '🚀 Generando...' : '🚀 GENERAR CÓDIGOS'}
           </button>
 
-          {status && <p className={`text-center font-bold ${status.includes('✅') ? 'text-green-400' : status.includes('') ? 'text-red-400' : 'text-white'}`}>{status}</p>}
+          {status && <p className={`text-center font-bold ${status.includes('✅') ? 'text-green-400' : status.includes('❌') ? 'text-red-400' : 'text-white'}`}>{status}</p>}
 
           {codes.length > 0 && (
             <div className="mt-6">
