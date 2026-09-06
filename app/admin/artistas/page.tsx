@@ -12,6 +12,7 @@ interface AlbumTrack {
 export default function AdminPublicar() {
   const router = useRouter();
   const [publishMode, setPublishMode] = useState<'single' | 'album'>('single');
+  const [copiedArtist, setCopiedArtist] = useState<string | null>(null);
   
   // --- ESTADOS PARA SENCILLO ---
   const [step, setStep] = useState(1);
@@ -53,19 +54,84 @@ export default function AdminPublicar() {
   };
 
   // ==========================================
-  // LÓGICA MODO SENCILLO
+  // FUNCIÓN DE COPIAR ENLACE DEL REPRODUCTOR
+  // ==========================================
+  const copyArtistLink = async (artist: any) => {
+    const link = `https://fonotap.vercel.app/acceso/${artist.slug}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedArtist(artist.id);
+      setTimeout(() => setCopiedArtist(null), 2000);
+    } catch (error) {
+      const textArea = document.createElement('textarea');
+      textArea.value = link;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedArtist(artist.id);
+      setTimeout(() => setCopiedArtist(null), 2000);
+    }
+  };
+
+  // ==========================================
+  // FUNCIÓN DE EDITAR ARTISTA (BLINDADA)
   // ==========================================
   const editArtist = (artist: any) => {
+    console.log("Editando artista:", artist);
     setEditingArtist(artist);
     setFormData({
-      artist_name: artist.name, artist_slug: artist.slug, short_bio: artist.short_bio || '',
-      instagram_url: artist.instagram_url || '', cover_file: null, canvas_file: null,
-      track_title: '', audio_file: null, composer_name: '', composer_percentage: 0,
+      artist_name: artist.name, 
+      artist_slug: artist.slug, 
+      short_bio: artist.short_bio || '',
+      instagram_url: artist.instagram_url || '', 
+      cover_file: null, 
+      canvas_file: null,
+      track_title: '', 
+      audio_file: null, 
+      composer_name: '', 
+      composer_percentage: 0,
     });
     setStep(1);
+    setStatus(''); // Limpiar estado anterior
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // ==========================================
+  // FUNCIÓN DE ELIMINAR ARTISTA (BLINDADA)
+  // ==========================================
+  const deleteArtist = async (artist: any) => {
+    console.log("Intentando eliminar artista:", artist);
+    const confirmacion = window.confirm(`⚠️ ¿Estás seguro de eliminar a "${artist.name}"?\n\nEsto borrará al artista y TODAS sus canciones. Los códigos generados dejarán de funcionar.\n\nEsta acción NO se puede deshacer.`);
+    if (!confirmacion) return;
+
+    try {
+      setStatus('🗑️ Eliminando...');
+      
+      // 1. Borrar las canciones del artista
+      const { error: tracksError } = await supabase.from('tracks').delete().eq('artist_id', artist.id);
+      if (tracksError) throw tracksError;
+
+      // 2. Borrar los códigos de acceso del artista
+      const { error: codesError } = await supabase.from('access_codes').delete().eq('artist_id', artist.id);
+      if (codesError) throw codesError;
+
+      // 3. Borrar al artista
+      const { error: artistError } = await supabase.from('artists').delete().eq('id', artist.id);
+      if (artistError) throw artistError;
+
+      alert(`✅ "${artist.name}" eliminado correctamente.`);
+      setStatus('');
+      fetchArtists(); // Actualizar la lista
+    } catch (error: any) {
+      alert('❌ Error al eliminar: ' + error.message);
+      setStatus('');
+    }
+  };
+
+  // ==========================================
+  // LÓGICA MODO SENCILLO
+  // ==========================================
   const handlePublishSingle = async () => {
     setLoading(true); setStatus('🚀 Iniciando...');
     try {
@@ -105,7 +171,6 @@ export default function AdminPublicar() {
   const publishAlbum = async () => {
     let finalArtistId = selectedArtistId;
 
-    // 1. Si es artista nuevo, lo creamos primero
     if (albumArtistMode === 'new') {
       if (!newArtistData.name || !newArtistData.slug) { alert('⚠️ Pon el nombre y el slug del artista nuevo.'); return; }
       
@@ -119,13 +184,11 @@ export default function AdminPublicar() {
 
       if (artistError) { alert('❌ Error al crear artista: ' + artistError.message); return; }
       finalArtistId = artistData.id;
-      fetchArtists(); // Actualizar la lista
+      fetchArtists();
     } else {
-      // 2. Si es existente, validamos que haya seleccionado uno
-      if (!finalArtistId) { alert('️ Selecciona un artista existente.'); return; }
+      if (!finalArtistId) { alert('⚠️ Selecciona un artista existente.'); return; }
     }
 
-    // 3. Subir canciones
     setAlbumLoading(true);
     let currentTracks = [...albumTracks];
     const updateTrack = (index: number, field: keyof AlbumTrack, value: any) => { currentTracks[index] = { ...currentTracks[index], [field]: value }; setAlbumTracks([...currentTracks]); };
@@ -166,7 +229,7 @@ export default function AdminPublicar() {
           <h1 className="text-3xl font-bold mb-6 text-purple-400">Centro de Publicación</h1>
           <div className="inline-flex bg-zinc-900 p-1 rounded-xl border border-zinc-800">
             <button onClick={() => setPublishMode('single')} className={`px-8 py-3 rounded-lg font-bold transition-all ${publishMode === 'single' ? 'bg-purple-600 text-white shadow-lg' : 'text-zinc-400 hover:text-white'}`}>
-               Sencillo
+              🎤 Sencillo
             </button>
             <button onClick={() => setPublishMode('album')} className={`px-8 py-3 rounded-lg font-bold transition-all ${publishMode === 'album' ? 'bg-purple-600 text-white shadow-lg' : 'text-zinc-400 hover:text-white'}`}>
               💿 Álbum
@@ -188,17 +251,28 @@ export default function AdminPublicar() {
                 <h2 className="text-xl font-bold mb-4">Paso 1: Datos del Artista</h2>
                 <input type="text" placeholder="Nombre del Artista" value={formData.artist_name} onChange={e => setFormData({...formData, artist_name: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
                 <input type="text" placeholder="Slug (ej: herencina)" value={formData.artist_slug} onChange={e => setFormData({...formData, artist_slug: e.target.value.toLowerCase().replace(/\s+/g, '-')})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
-                <textarea placeholder="Biografía" value={formData.short_bio} onChange={e => setFormData({...formData, short_bio: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700 h-24" />
-                <input type="text" placeholder="Instagram" value={formData.instagram_url} onChange={e => setFormData({...formData, instagram_url: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
+                <textarea placeholder="Biografía corta" value={formData.short_bio} onChange={e => setFormData({...formData, short_bio: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700 h-24" />
+                <input type="text" placeholder="Link de Instagram" value={formData.instagram_url} onChange={e => setFormData({...formData, instagram_url: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
                 <button onClick={() => setStep(2)} className="w-full bg-purple-600 hover:bg-purple-700 py-3 rounded font-bold">Siguiente →</button>
               </div>
             )}
 
             {step === 2 && (
-              <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
-                <h2 className="text-xl font-bold mb-4">Paso 2: Imágenes</h2>
-                <input type="file" accept="image/*" onChange={e => setFormData({...formData, cover_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700" />
-                <input type="file" accept="video/*" onChange={e => setFormData({...formData, canvas_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700" />
+              <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-6">
+                <h2 className="text-xl font-bold mb-4">Paso 2: Imágenes y Video</h2>
+                
+                <div>
+                  <label className="block text-sm font-bold text-purple-400 mb-1">🖼️ Portada del Artista (Imagen)</label>
+                  <p className="text-xs text-zinc-500 mb-2">Recomendado: 1080x1080px (JPG o PNG)</p>
+                  <input type="file" accept="image/*" onChange={e => setFormData({...formData, cover_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-purple-400 mb-1">🎥 Canvas / Video de Fondo (Video)</label>
+                  <p className="text-xs text-zinc-500 mb-2">Recomendado: MP4 vertical o cuadrado, máx 15MB</p>
+                  <input type="file" accept="video/*" onChange={e => setFormData({...formData, canvas_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
+                </div>
+
                 <div className="flex gap-4">
                   <button onClick={() => setStep(1)} className="flex-1 bg-zinc-700 hover:bg-zinc-600 py-3 rounded font-bold">← Atrás</button>
                   <button onClick={() => setStep(3)} className="flex-1 bg-purple-600 hover:bg-purple-700 py-3 rounded font-bold">Siguiente →</button>
@@ -207,12 +281,19 @@ export default function AdminPublicar() {
             )}
 
             {step === 3 && (
-              <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+              <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-6">
                 <h2 className="text-xl font-bold mb-4">Paso 3: Canción</h2>
-                <input type="text" placeholder="Título" value={formData.track_title} onChange={e => setFormData({...formData, track_title: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
-                <input type="file" accept="audio/*" onChange={e => setFormData({...formData, audio_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700" />
-                <input type="text" placeholder="Compositor" value={formData.composer_name} onChange={e => setFormData({...formData, composer_name: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
-                <input type="number" placeholder="Regalía %" value={formData.composer_percentage} onChange={e => setFormData({...formData, composer_percentage: parseInt(e.target.value) || 0})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
+                <input type="text" placeholder="Título de la Canción" value={formData.track_title} onChange={e => setFormData({...formData, track_title: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
+                
+                <div>
+                  <label className="block text-sm font-bold text-purple-400 mb-1">🎵 Archivo de Audio (Canción)</label>
+                  <p className="text-xs text-zinc-500 mb-2">Formato: MP3 o WAV (Máx 20MB)</p>
+                  <input type="file" accept="audio/*" onChange={e => setFormData({...formData, audio_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
+                </div>
+
+                <input type="text" placeholder="Nombre del Compositor" value={formData.composer_name} onChange={e => setFormData({...formData, composer_name: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
+                <input type="number" placeholder="Regalía del Compositor (%)" value={formData.composer_percentage} onChange={e => setFormData({...formData, composer_percentage: parseInt(e.target.value) || 0})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
+                
                 <div className="flex gap-4">
                   <button onClick={() => setStep(2)} className="flex-1 bg-zinc-700 hover:bg-zinc-600 py-3 rounded font-bold">← Atrás</button>
                   <button onClick={() => setStep(4)} className="flex-1 bg-purple-600 hover:bg-purple-700 py-3 rounded font-bold">Revisar →</button>
@@ -222,18 +303,30 @@ export default function AdminPublicar() {
 
             {step === 4 && (
               <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
-                <h2 className="text-xl font-bold mb-4">Paso 4: Revisar</h2>
+                <h2 className="text-xl font-bold mb-4">Paso 4: Revisar y Publicar</h2>
                 <div className="bg-zinc-800 p-4 rounded space-y-2 text-sm">
-                  <p><strong>Artista:</strong> {formData.artist_name}</p>
+                  <p><strong>Artista:</strong> {formData.artist_name} <span className="text-zinc-500">(/ {formData.artist_slug})</span></p>
                   <p><strong>Canción:</strong> {formData.track_title || 'Sin canción'}</p>
                 </div>
+                
                 {status && <p className={`text-center font-bold ${status.includes('✅') ? 'text-green-400' : 'text-red-400'}`}>{status}</p>}
+                
                 {status.includes('✅') && !status.includes('Actualizado') && (
-                  <button onClick={() => router.push('/admin/codigos')} className="w-full bg-green-600 hover:bg-green-700 py-3 rounded font-bold">🎟️ Ir a Generar Códigos →</button>
+                  <div className="bg-green-900/20 border border-green-500/30 p-4 rounded-xl text-center space-y-3 animate-in fade-in zoom-in duration-300">
+                    <p className="text-green-400 font-bold text-lg">🎉 ¡Artista Publicado con Éxito!</p>
+                    <p className="text-zinc-400 text-sm">El siguiente paso es generar los códigos de acceso para este artista.</p>
+                    <button 
+                      onClick={() => router.push('/admin/codigos')} 
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition-all shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
+                    >
+                      🎟️ Ir a Generar Códigos de Acceso →
+                    </button>
+                  </div>
                 )}
+
                 <div className="flex gap-4">
                   <button onClick={() => setStep(3)} disabled={loading} className="flex-1 bg-zinc-700 py-3 rounded font-bold">← Atrás</button>
-                  <button onClick={handlePublishSingle} disabled={loading} className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 py-3 rounded font-bold">{loading ? '...' : ' PUBLICAR'}</button>
+                  <button onClick={handlePublishSingle} disabled={loading} className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 py-3 rounded font-bold">{loading ? 'Publicando...' : '🚀 PUBLICAR'}</button>
                 </div>
               </div>
             )}
@@ -246,9 +339,38 @@ export default function AdminPublicar() {
                   <div key={artist.id} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 relative group">
                     <img src={artist.cover_url || 'https://via.placeholder.com/200'} className="w-full h-40 object-cover rounded mb-3" />
                     <h3 className="font-bold">{artist.name}</h3>
-                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => router.push('/admin/codigos')} className="bg-green-600 p-2 rounded-lg">🎟️</button>
-                      <button onClick={() => editArtist(artist)} className="bg-blue-600 p-2 rounded-lg">️</button>
+                    <p className="text-xs text-zinc-500 mb-3">/{artist.slug}</p>
+                    
+                    {/* 4 BOTONES FLOTANTES BLINDADOS */}
+                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); copyArtistLink(artist); }} 
+                        className={`${copiedArtist === artist.id ? 'bg-green-600' : 'bg-purple-600 hover:bg-purple-700'} p-2 rounded-lg shadow-lg transition-all`}
+                        title="Copiar enlace del reproductor"
+                      >
+                        {copiedArtist === artist.id ? '✅' : '🔗'}
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); router.push('/admin/codigos'); }} 
+                        className="bg-green-600 hover:bg-green-700 p-2 rounded-lg shadow-lg" 
+                        title="Generar Códigos"
+                      >
+                        🎟️
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); editArtist(artist); }} 
+                        className="bg-blue-600 hover:bg-blue-700 p-2 rounded-lg shadow-lg" 
+                        title="Editar artista"
+                      >
+                        ✏️
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); deleteArtist(artist); }} 
+                        className="bg-red-600 hover:bg-red-700 p-2 rounded-lg shadow-lg" 
+                        title="Eliminar artista"
+                      >
+                        🗑️
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -262,12 +384,9 @@ export default function AdminPublicar() {
         {/* ========================================== */}
         {publishMode === 'album' && (
           <div className="animate-in fade-in duration-300">
-            
-            {/* SELECCIÓN DE ARTISTA (EXISTENTE O NUEVO) */}
             <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 mb-8">
               <h2 className="text-xl font-bold mb-4 text-purple-400">1. Configurar Artista</h2>
               
-              {/* Interruptor Existente / Nuevo */}
               <div className="inline-flex bg-zinc-800 p-1 rounded-lg border border-zinc-700 mb-4">
                 <button onClick={() => setAlbumArtistMode('existing')} className={`px-4 py-2 rounded-md font-bold text-sm transition-all ${albumArtistMode === 'existing' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}>
                   📂 Artista Existente
@@ -289,14 +408,19 @@ export default function AdminPublicar() {
                   <input type="text" placeholder="Instagram" value={newArtistData.instagram_url} onChange={e => setNewArtistData({...newArtistData, instagram_url: e.target.value})} className="p-3 bg-zinc-800 rounded border border-zinc-700" />
                   <input type="text" placeholder="Biografía corta" value={newArtistData.short_bio} onChange={e => setNewArtistData({...newArtistData, short_bio: e.target.value})} className="p-3 bg-zinc-800 rounded border border-zinc-700" />
                   <div className="md:col-span-2 flex flex-col md:flex-row gap-4">
-                    <input type="file" accept="image/*" onChange={e => setNewArtistData({...newArtistData, cover_file: e.target.files?.[0] || null})} className="flex-1 p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
-                    <input type="file" accept="video/*" onChange={e => setNewArtistData({...newArtistData, canvas_file: e.target.files?.[0] || null})} className="flex-1 p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-purple-400 mb-1">🖼️ Portada del Artista</label>
+                      <input type="file" accept="image/*" onChange={e => setNewArtistData({...newArtistData, cover_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-purple-400 mb-1">🎥 Canvas / Video</label>
+                      <input type="file" accept="video/*" onChange={e => setNewArtistData({...newArtistData, canvas_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* LISTA DE CANCIONES DEL ÁLBUM */}
             <div className="space-y-4 mb-8">
               {albumTracks.map((track, index) => (
                 <div key={track.id} className={`bg-zinc-900 p-6 rounded-xl border ${track.status === 'success' ? 'border-green-500/50' : track.status === 'error' ? 'border-red-500/50' : 'border-zinc-800'}`}>
@@ -306,7 +430,7 @@ export default function AdminPublicar() {
                       {track.status === 'uploading' && <span className="text-xs text-yellow-400 animate-pulse">⏳ Subiendo...</span>}
                       {track.status === 'success' && <span className="text-xs text-green-400 font-bold">{track.message}</span>}
                       {track.status === 'error' && <span className="text-xs text-red-400">{track.message}</span>}
-                      <button onClick={() => removeTrack(index)} className="text-red-400 hover:text-red-300 text-sm font-bold">🗑️ Eliminar</button>
+                      <button onClick={(e) => { e.stopPropagation(); removeTrack(index); }} className="text-red-400 hover:text-red-300 text-sm font-bold">🗑️ Eliminar</button>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -320,9 +444,11 @@ export default function AdminPublicar() {
                       <input type="number" placeholder="Regalía %" value={track.percentage} onChange={e => { const n = [...albumTracks]; n[index].percentage = parseInt(e.target.value) || 0; setAlbumTracks(n); }} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
                     </div>
                     <div>
+                      <label className="block text-xs font-bold text-purple-400 mb-1">🎵 Archivo de Audio</label>
                       <input type="file" accept="audio/*" onChange={e => { const n = [...albumTracks]; n[index].audio_file = e.target.files?.[0] || null; setAlbumTracks(n); }} className="w-full p-1 bg-zinc-800 rounded border border-zinc-700 text-xs" />
                     </div>
                     <div>
+                      <label className="block text-xs font-bold text-purple-400 mb-1">🖼️ Portada Canción (Opcional)</label>
                       <input type="file" accept="image/*" onChange={e => { const n = [...albumTracks]; n[index].cover_file = e.target.files?.[0] || null; setAlbumTracks(n); }} className="w-full p-1 bg-zinc-800 rounded border border-zinc-700 text-xs" />
                     </div>
                   </div>

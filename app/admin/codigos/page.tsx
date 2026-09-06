@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import QRCode from 'qrcode';
 
 export default function AdminCodigos() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function AdminCodigos() {
   const [codes, setCodes] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [status, setStatus] = useState<string>('');
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   useEffect(() => {
     fetchArtists();
@@ -19,6 +21,23 @@ export default function AdminCodigos() {
   const fetchArtists = async () => {
     const { data } = await supabase.from('artists').select('id, name, slug').order('name');
     if (data) setArtists(data as any[]);
+  };
+
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch (error) {
+      const textArea = document.createElement('textarea');
+      textArea.value = code;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    }
   };
 
   const generateCodes = async () => {
@@ -45,8 +64,9 @@ export default function AdminCodigos() {
       for (let i = 0; i < quantity; i++) {
         const code = `FONO-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
         const access_url = `/acceso/${artist.slug}`;
+        const full_url = `https://fonotap.vercel.app${access_url}`;
         
-        newCodes.push({ code, artist_id: selectedArtistId, access_url, is_used: false });
+        newCodes.push({ code, artist_id: selectedArtistId, access_url, full_url, is_used: false });
         codesToInsert.push({ code, artist_id: selectedArtistId, access_url, is_used: false });
       }
 
@@ -69,7 +89,7 @@ export default function AdminCodigos() {
 
     let csvContent = "data:text/csv;charset=utf-8,Código,URL de Acceso,Estado\n";
     codes.forEach((row: any) => {
-      csvContent += `${row.code},https://fonotap.vercel.app${row.access_url},Disponible\n`;
+      csvContent += `${row.code},${row.full_url},Disponible\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
@@ -79,6 +99,81 @@ export default function AdminCodigos() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const downloadPNG = async (code: any) => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      canvas.width = 400;
+      canvas.height = 500;
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = '#9333EA';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+
+      ctx.fillStyle = '#9333EA';
+      ctx.font = 'bold 32px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('FONOTAP', canvas.width / 2, 50);
+
+      const qrDataUrl = await QRCode.toDataURL(code.full_url, {
+        width: 250,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+
+      const qrImg = new Image();
+      qrImg.src = qrDataUrl;
+      
+      await new Promise((resolve) => {
+        qrImg.onload = resolve;
+      });
+
+      const qrX = (canvas.width - 250) / 2;
+      const qrY = 80;
+      ctx.drawImage(qrImg, qrX, qrY, 250, 250);
+
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 24px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(code.code, canvas.width / 2, 380);
+
+      ctx.fillStyle = '#666666';
+      ctx.font = '14px Arial';
+      ctx.fillText('Escanea el QR o ingresa el código', canvas.width / 2, 420);
+      ctx.fillText('en fonotap.vercel.app', canvas.width / 2, 445);
+
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `${code.code}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error('Error al generar PNG:', error);
+      alert('❌ Error al generar la imagen');
+    }
+  };
+
+  const downloadAllPNGs = async () => {
+    if (codes.length === 0) return;
+    
+    setStatus('📦 Generando todas las imágenes...');
+    
+    for (let i = 0; i < codes.length; i++) {
+      await downloadPNG(codes[i]);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    setStatus(`✅ ${codes.length} imágenes descargadas.`);
   };
 
   return (
@@ -127,15 +222,43 @@ export default function AdminCodigos() {
           {status && <p className={`text-center font-bold ${status.includes('✅') ? 'text-green-400' : status.includes('❌') ? 'text-red-400' : 'text-white'}`}>{status}</p>}
 
           {codes.length > 0 && (
-            <div className="mt-6">
-              <button onClick={downloadCSV} className="w-full bg-green-600 hover:bg-green-700 py-3 rounded-xl font-bold mb-4">
-                ⬇️ Descargar CSV
-              </button>
-              <div className="bg-black/50 p-4 rounded-lg border border-zinc-800 max-h-60 overflow-y-auto">
+            <div className="mt-6 space-y-4">
+              <div className="flex gap-4">
+                <button onClick={downloadCSV} className="flex-1 bg-green-600 hover:bg-green-700 py-3 rounded-xl font-bold">
+                  ⬇️ Descargar CSV
+                </button>
+                <button onClick={downloadAllPNGs} className="flex-1 bg-blue-600 hover:bg-blue-700 py-3 rounded-xl font-bold">
+                  📦 Descargar Todas las Imágenes
+                </button>
+              </div>
+
+              <div className="bg-black/50 p-4 rounded-lg border border-zinc-800 max-h-96 overflow-y-auto space-y-3">
                 {codes.map((item: any, i: number) => (
-                  <div key={i} className="flex justify-between py-2 border-b border-zinc-800 last:border-0 text-sm">
-                    <span className="font-mono text-purple-400">{item.code}</span>
-                    <span className="text-zinc-500 text-xs truncate ml-4">{item.access_url}</span>
+                  <div key={i} className="bg-zinc-900 p-4 rounded-lg border border-zinc-700">
+                    {/* CÓDIGO ALFANUMÉRICO CON BOTÓN DE COPIAR */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="flex-1 bg-zinc-800 border border-purple-500/30 rounded-lg px-4 py-3 font-mono text-purple-400 text-lg font-bold">
+                        {item.code}
+                      </div>
+                      <button 
+                        onClick={() => copyCode(item.code)}
+                        className={`${copiedCode === item.code ? 'bg-green-600' : 'bg-purple-600 hover:bg-purple-700'} px-4 py-3 rounded-lg font-bold text-sm transition-all whitespace-nowrap`}
+                      >
+                        {copiedCode === item.code ? '✅ Copiado' : '📋 Copiar'}
+                      </button>
+                      <button 
+                        onClick={() => downloadPNG(item)}
+                        className="bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded-lg font-bold text-sm whitespace-nowrap"
+                      >
+                        📥 PNG
+                      </button>
+                    </div>
+
+                    {/* ENLACE PARA NFC */}
+                    <div className="bg-zinc-800/50 rounded p-3 border border-zinc-700">
+                      <p className="text-xs text-zinc-400 mb-1 font-bold">📱 Enlace para programar NFC:</p>
+                      <p className="text-green-400 font-mono text-sm break-all">{item.full_url}</p>
+                    </div>
                   </div>
                 ))}
               </div>
