@@ -85,9 +85,6 @@ export default function AdminPublicar() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // ==========================================
-  // ELIMINAR = MANDAR A LA PAPELERA (No borra nada)
-  // ==========================================
   const deleteArtist = async (artist: any) => {
     const confirmacion = window.confirm(`⚠️ ¿Mandar a "${artist.name}" a la papelera?\n\nEl artista desaparecerá de la página pública pero sus datos se guardan.\n\nPuedes rescatarlo después desde la Papelera.`);
     if (!confirmacion) return;
@@ -102,37 +99,28 @@ export default function AdminPublicar() {
     }
   };
 
-  // ==========================================
-  // RESCATAR ARTISTA DE LA PAPELERA
-  // ==========================================
   const restoreArtist = async (artist: any) => {
     try {
       const { error } = await supabase.from('artists').update({ is_active: true }).eq('id', artist.id);
       if (error) throw error;
-      alert(`✅ "${artist.name}" rescatado exitosamente. Ya aparece de nuevo en la página.`);
+      alert(`✅ "${artist.name}" rescatado exitosamente.`);
       fetchArtists();
     } catch (error: any) {
       alert('❌ Error al rescatar: ' + error.message);
     }
   };
 
-  // ==========================================
-  // BORRAR PERMANENTEMENTE (Solo desde la papelera)
-  // ==========================================
   const permanentDelete = async (artist: any) => {
-    const confirmacion = window.confirm(`🚨 ¿BORRAR PERMANENTEMENTE a "${artist.name}"?\n\nEsto eliminará al artista, TODAS sus canciones y TODOS sus códigos.\n\nESTA ACCIÓN NO SE PUEDE DESHACER.`);
+    const confirmacion = window.confirm(` ¿BORRAR PERMANENTEMENTE a "${artist.name}"?\n\nEsto eliminará al artista, TODAS sus canciones y TODOS sus códigos.\n\nESTA ACCIÓN NO SE PUEDE DESHACER.`);
     if (!confirmacion) return;
 
     try {
       const { error: tracksError } = await supabase.from('tracks').delete().eq('artist_id', artist.id);
       if (tracksError) throw tracksError;
-
       const { error: codesError } = await supabase.from('access_codes').delete().eq('artist_id', artist.id);
       if (codesError) throw codesError;
-
       const { error: artistError } = await supabase.from('artists').delete().eq('id', artist.id);
       if (artistError) throw artistError;
-
       alert(`🗑️ "${artist.name}" borrado permanentemente.`);
       fetchArtists();
     } catch (error: any) {
@@ -141,7 +129,7 @@ export default function AdminPublicar() {
   };
 
   const handlePublishSingle = async () => {
-    setLoading(true); setStatus('🚀 Iniciando...');
+    setLoading(true); setStatus(' Iniciando...');
     try {
       let coverUrl = editingArtist?.cover_url || '';
       if (formData.cover_file) { coverUrl = await uploadFile(formData.cover_file, 'artist-covers'); }
@@ -176,7 +164,7 @@ export default function AdminPublicar() {
   const publishAlbum = async () => {
     let finalArtistId = selectedArtistId;
     if (albumArtistMode === 'new') {
-      if (!newArtistData.name || !newArtistData.slug) { alert('⚠️ Pon el nombre y el slug del artista nuevo.'); return; }
+      if (!newArtistData.name || !newArtistData.slug) { alert('️ Pon el nombre y el slug del artista nuevo.'); return; }
       let coverUrl = newArtistData.cover_file ? await uploadFile(newArtistData.cover_file, 'artist-covers') : '';
       let canvasUrl = newArtistData.canvas_file ? await uploadFile(newArtistData.canvas_file, 'videos') : '';
       const { data: artistData, error: artistError } = await supabase.from('artists').insert([{
@@ -187,7 +175,7 @@ export default function AdminPublicar() {
       finalArtistId = artistData.id;
       fetchArtists();
     } else {
-      if (!finalArtistId) { alert('⚠️ Selecciona un artista existente.'); return; }
+      if (!finalArtistId) { alert('️ Selecciona un artista existente.'); return; }
     }
     setAlbumLoading(true);
     let currentTracks = [...albumTracks];
@@ -224,7 +212,7 @@ export default function AdminPublicar() {
           <h1 className="text-3xl font-bold mb-6 text-purple-400">Centro de Publicación</h1>
           <div className="inline-flex bg-zinc-900 p-1 rounded-xl border border-zinc-800">
             <button onClick={() => setPublishMode('single')} className={`px-8 py-3 rounded-lg font-bold transition-all ${publishMode === 'single' ? 'bg-purple-600 text-white shadow-lg' : 'text-zinc-400 hover:text-white'}`}>
-              🎤 Sencillo
+               Sencillo
             </button>
             <button onClick={() => setPublishMode('album')} className={`px-8 py-3 rounded-lg font-bold transition-all ${publishMode === 'album' ? 'bg-purple-600 text-white shadow-lg' : 'text-zinc-400 hover:text-white'}`}>
               💿 Álbum
@@ -241,8 +229,35 @@ export default function AdminPublicar() {
             {step === 1 && (
               <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
                 <h2 className="text-xl font-bold mb-4">Paso 1: Datos del Artista</h2>
-                <input type="text" placeholder="Nombre del Artista" value={formData.artist_name} onChange={e => setFormData({...formData, artist_name: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
-                <input type="text" placeholder="Slug (ej: herencina)" value={formData.artist_slug} onChange={e => setFormData({...formData, artist_slug: e.target.value.toLowerCase().replace(/\s+/g, '-')})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
+                
+                {/* CAMBIO 1: SLUG AUTOMÁTICO */}
+                <div>
+                  <label className="block text-sm font-bold text-purple-400 mb-1">Nombre del Artista</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ej: La Herencina" 
+                    value={formData.artist_name} 
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      // Genera el slug automáticamente: minúsculas, guiones en espacios, sin caracteres raros
+                      const autoSlug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                      setFormData({...formData, artist_name: name, artist_slug: autoSlug});
+                    }} 
+                    className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-zinc-500 mb-1">Slug (URL) - Se genera solo, pero puedes editarlo</label>
+                  <input 
+                    type="text" 
+                    placeholder="la-herencina" 
+                    value={formData.artist_slug} 
+                    onChange={e => setFormData({...formData, artist_slug: e.target.value.toLowerCase().replace(/\s+/g, '-')})} 
+                    className="w-full p-3 bg-zinc-800/50 rounded border border-zinc-700 text-zinc-400 font-mono text-sm" 
+                  />
+                </div>
+
                 <textarea placeholder="Biografía corta" value={formData.short_bio} onChange={e => setFormData({...formData, short_bio: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700 h-24" />
                 <input type="text" placeholder="Link de Instagram" value={formData.instagram_url} onChange={e => setFormData({...formData, instagram_url: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
                 <button onClick={() => setStep(2)} className="w-full bg-purple-600 hover:bg-purple-700 py-3 rounded font-bold">Siguiente →</button>
@@ -295,18 +310,32 @@ export default function AdminPublicar() {
                   <p><strong>Canción:</strong> {formData.track_title || 'Sin canción'}</p>
                 </div>
                 {status && <p className={`text-center font-bold ${status.includes('✅') ? 'text-green-400' : 'text-red-400'}`}>{status}</p>}
+                
+                {/* CAMBIO 2: BOTONES DE ACCIÓN POST-PUBLICACIÓN */}
                 {status.includes('✅') && !status.includes('Actualizado') && (
-                  <div className="bg-green-900/20 border border-green-500/30 p-4 rounded-xl text-center space-y-3">
+                  <div className="bg-green-900/20 border border-green-500/30 p-4 rounded-xl text-center space-y-3 animate-in fade-in zoom-in duration-300">
                     <p className="text-green-400 font-bold text-lg">🎉 ¡Artista Publicado con Éxito!</p>
-                    <p className="text-zinc-400 text-sm">El siguiente paso es generar los códigos de acceso.</p>
-                    <button onClick={() => router.push('/admin/codigos')} className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition-all shadow-lg shadow-green-600/20 flex items-center justify-center gap-2">
-                      🎟️ Ir a Generar Códigos de Acceso →
-                    </button>
+                    <p className="text-zinc-400 text-sm">Verifica que todo esté perfecto y genera los códigos.</p>
+                    <div className="flex flex-col gap-3">
+                      <button 
+                        onClick={() => window.open(`/acceso/${formData.artist_slug}`, '_blank')} 
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-lg transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
+                      >
+                        👁️ Abrir Reproductor en Nueva Pestaña
+                      </button>
+                      <button 
+                        onClick={() => router.push('/admin/codigos')} 
+                        className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold text-lg transition-all shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
+                      >
+                        🎟️ Ir a Generar Códigos de Acceso →
+                      </button>
+                    </div>
                   </div>
                 )}
+
                 <div className="flex gap-4">
                   <button onClick={() => setStep(3)} disabled={loading} className="flex-1 bg-zinc-700 py-3 rounded font-bold">← Atrás</button>
-                  <button onClick={handlePublishSingle} disabled={loading} className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 py-3 rounded font-bold">{loading ? 'Publicando...' : '🚀 PUBLICAR'}</button>
+                  <button onClick={handlePublishSingle} disabled={loading} className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 py-3 rounded font-bold">{loading ? 'Publicando...' : ' PUBLICAR'}</button>
                 </div>
               </div>
             )}
@@ -316,10 +345,7 @@ export default function AdminPublicar() {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold">Artistas Publicados</h2>
                 {trashedArtists.length > 0 && (
-                  <button 
-                    onClick={() => setShowTrash(!showTrash)}
-                    className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all"
-                  >
+                  <button onClick={() => setShowTrash(!showTrash)} className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all">
                     🗑️ Papelera ({trashedArtists.length})
                   </button>
                 )}
@@ -350,12 +376,11 @@ export default function AdminPublicar() {
               )}
             </div>
 
-            {/* PAPELERA DE RECICLAJE */}
+            {/* PAPELERA */}
             {showTrash && (
               <div className="mt-8 bg-zinc-900/50 border border-red-500/30 rounded-xl p-6">
                 <h2 className="text-xl font-bold text-red-400 mb-4 flex items-center gap-2">
                   🗑️ Papelera de Reciclaje
-                  <span className="text-xs text-zinc-500 font-normal">(Los artistas aquí no aparecen en la página pública)</span>
                 </h2>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {trashedArtists.map(artist => (
@@ -364,19 +389,10 @@ export default function AdminPublicar() {
                       <h3 className="font-bold line-through">{artist.name}</h3>
                       <p className="text-xs text-zinc-500 mb-3">/{artist.slug}</p>
                       <div className="flex gap-2 mt-2">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); restoreArtist(artist); }} 
-                          className="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-1"
-                        >
+                        <button onClick={(e) => { e.stopPropagation(); restoreArtist(artist); }} className="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-1">
                           ♻️ Rescatar
                         </button>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); permanentDelete(artist); }} 
-                          className="bg-red-800 hover:bg-red-900 px-3 py-2 rounded-lg text-sm transition-all"
-                          title="Borrar permanentemente"
-                        >
-                          💀
-                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); permanentDelete(artist); }} className="bg-red-800 hover:bg-red-900 px-3 py-2 rounded-lg text-sm transition-all" title="Borrar permanentemente">💀</button>
                       </div>
                     </div>
                   ))}
@@ -435,7 +451,7 @@ export default function AdminPublicar() {
                     <div><input type="text" placeholder="Compositor" value={track.composer} onChange={e => { const n = [...albumTracks]; n[index].composer = e.target.value; setAlbumTracks(n); }} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" /></div>
                     <div><input type="number" placeholder="Regalía %" value={track.percentage} onChange={e => { const n = [...albumTracks]; n[index].percentage = parseInt(e.target.value) || 0; setAlbumTracks(n); }} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" /></div>
                     <div><label className="block text-xs font-bold text-purple-400 mb-1">🎵 Archivo de Audio</label><input type="file" accept="audio/*" onChange={e => { const n = [...albumTracks]; n[index].audio_file = e.target.files?.[0] || null; setAlbumTracks(n); }} className="w-full p-1 bg-zinc-800 rounded border border-zinc-700 text-xs" /></div>
-                    <div><label className="block text-xs font-bold text-purple-400 mb-1">🖼️ Portada Canción</label><input type="file" accept="image/*" onChange={e => { const n = [...albumTracks]; n[index].cover_file = e.target.files?.[0] || null; setAlbumTracks(n); }} className="w-full p-1 bg-zinc-800 rounded border border-zinc-700 text-xs" /></div>
+                    <div><label className="block text-xs font-bold text-purple-400 mb-1">️ Portada Canción</label><input type="file" accept="image/*" onChange={e => { const n = [...albumTracks]; n[index].cover_file = e.target.files?.[0] || null; setAlbumTracks(n); }} className="w-full p-1 bg-zinc-800 rounded border border-zinc-700 text-xs" /></div>
                   </div>
                 </div>
               ))}

@@ -1,148 +1,106 @@
 ﻿"use client";
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
-export default function AdminCodigos() {
-  const router = useRouter();
-  const [artists, setArtists] = useState<any[]>([]);
-  const [selectedArtistId, setSelectedArtistId] = useState<string>('');
-  const [quantity, setQuantity] = useState<number>(10);
-  const [codes, setCodes] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [status, setStatus] = useState<string>('');
+export default function AdminDashboard() {
+  const [stats, setStats] = useState({ artists: 0, tracks: 0, codes: 0 });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchArtists();
+    fetchStats();
   }, []);
 
-  const fetchArtists = async () => {
-    const { data } = await supabase.from('artists').select('id, name, slug').order('name');
-    if (data) setArtists(data as any[]);
-  };
-
-  const generateCodes = async () => {
-    if (!selectedArtistId) {
-      alert('⚠️ Selecciona un artista primero.');
-      return;
-    }
-    if (quantity < 1 || quantity > 1000) {
-      alert('⚠️ La cantidad debe ser entre 1 y 1000.');
-      return;
-    }
-
-    setLoading(true);
-    setStatus(' Generando códigos...');
-    setCodes([]);
-
+  const fetchStats = async () => {
     try {
-      const artist = artists.find((a: any) => a.id === selectedArtistId);
-      if (!artist) throw new Error('Artista no encontrado');
+      const { count: artistsCount } = await supabase.from('artists').select('*', { count: 'exact', head: true }).eq('is_active', true);
+      const { count: tracksCount } = await supabase.from('tracks').select('*', { count: 'exact', head: true });
+      const { count: codesCount } = await supabase.from('access_codes').select('*', { count: 'exact', head: true }).eq('is_used', false);
 
-      const newCodes: any[] = [];
-      const codesToInsert: any[] = [];
-
-      for (let i = 0; i < quantity; i++) {
-        const code = `FONO-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-        const access_url = `/acceso/${artist.slug}`;
-        
-        newCodes.push({ code, artist_id: selectedArtistId, access_url, is_used: false });
-        codesToInsert.push({ code, artist_id: selectedArtistId, access_url, is_used: false });
-      }
-
-      const { error } = await supabase.from('access_codes').insert(codesToInsert);
-      if (error) throw error;
-
-      setCodes(newCodes);
-      setStatus(`✅ ${quantity} códigos generados exitosamente.`);
-    } catch (error: any) {
-      setStatus('❌ Error: ' + error.message);
+      setStats({
+        artists: artistsCount || 0,
+        tracks: tracksCount || 0,
+        codes: codesCount || 0
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const downloadCSV = () => {
-    if (codes.length === 0) return;
-    const artist = artists.find((a: any) => a.id === selectedArtistId);
-    if (!artist) return;
-
-    let csvContent = "data:text/csv;charset=utf-8,Código,URL de Acceso,Estado\n";
-    codes.forEach((row: any) => {
-      csvContent += `${row.code},https://fonotap.vercel.app${row.access_url},Disponible\n`;
-    });
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `codigos_${artist.slug}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   return (
-    <main className="min-h-screen bg-black text-white p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-purple-400">️ Generador de Códigos</h1>
-          <button onClick={() => router.push('/admin/artistas')} className="text-sm text-zinc-400 hover:text-white">← Volver a Artistas</button>
-        </div>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* HEADER */}
+      <div>
+        <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Centro de Mando </h1>
+        <p className="text-zinc-400">Bienvenido de nuevo, padrino. Aquí tienes el resumen de tu imperio.</p>
+      </div>
 
-        <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-6">
-          <div>
-            <label className="block text-sm font-bold mb-2">1. Selecciona el Artista</label>
-            <select 
-              value={selectedArtistId} 
-              onChange={e => setSelectedArtistId(e.target.value)}
-              className="w-full p-3 bg-zinc-800 rounded border border-zinc-700 text-white"
-            >
-              <option value="">-- Elige un artista --</option>
-              {artists.map((artist: any) => (
-                <option key={artist.id} value={artist.id}>{artist.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold mb-2">2. Cantidad de Códigos</label>
-            <input 
-              type="number" 
-              min="1" 
-              max="1000" 
-              value={quantity} 
-              onChange={e => setQuantity(parseInt(e.target.value) || 1)}
-              className="w-full p-3 bg-zinc-800 rounded border border-zinc-700 text-white"
-            />
-          </div>
-
-          <button 
-            onClick={generateCodes} 
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 py-4 rounded-xl font-bold text-lg transition-all"
-          >
-            {loading ? '🚀 Generando...' : ' GENERAR CÓDIGOS'}
-          </button>
-
-          {status && <p className={`text-center font-bold ${status.includes('✅') ? 'text-green-400' : status.includes('❌') ? 'text-red-400' : 'text-white'}`}>{status}</p>}
-
-          {codes.length > 0 && (
-            <div className="mt-6">
-              <button onClick={downloadCSV} className="w-full bg-green-600 hover:bg-green-700 py-3 rounded-xl font-bold mb-4">
-                ⬇️ Descargar CSV
-              </button>
-              <div className="bg-black/50 p-4 rounded-lg border border-zinc-800 max-h-60 overflow-y-auto">
-                {codes.map((item: any, i: number) => (
-                  <div key={i} className="flex justify-between py-2 border-b border-zinc-800 last:border-0 text-sm">
-                    <span className="font-mono text-purple-400">{item.code}</span>
-                    <span className="text-zinc-500 text-xs truncate ml-4">{item.access_url}</span>
-                  </div>
-                ))}
+      {/* TARJETAS DE ESTADÍSTICAS */}
+      {loading ? (
+        <div className="text-center py-20 text-zinc-500">Cargando estadísticas...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Tarjeta Artistas */}
+          <Link href="/admin/artistas" className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl hover:border-purple-500/50 transition-all group">
+            <div className="flex justify-between items-start mb-4">
+              <div className="w-12 h-12 bg-purple-600/20 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                🎤
               </div>
+              <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2 py-1 rounded-full">ACTIVOS</span>
             </div>
-          )}
+            <h3 className="text-4xl font-bold text-white mb-1">{stats.artists}</h3>
+            <p className="text-zinc-400 text-sm">Artistas Publicados</p>
+          </Link>
+
+          {/* Tarjeta Canciones */}
+          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl">
+            <div className="flex justify-between items-start mb-4">
+              <div className="w-12 h-12 bg-pink-600/20 rounded-xl flex items-center justify-center text-2xl">
+                🎵
+              </div>
+              <span className="text-xs font-bold text-zinc-400 bg-zinc-800 px-2 py-1 rounded-full">TOTAL</span>
+            </div>
+            <h3 className="text-4xl font-bold text-white mb-1">{stats.tracks}</h3>
+            <p className="text-zinc-400 text-sm">Canciones en Plataforma</p>
+          </div>
+
+          {/* Tarjeta Códigos */}
+          <Link href="/admin/codigos" className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl hover:border-green-500/50 transition-all group">
+            <div className="flex justify-between items-start mb-4">
+              <div className="w-12 h-12 bg-green-600/20 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                🎟️
+              </div>
+              <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2 py-1 rounded-full">DISPONIBLES</span>
+            </div>
+            <h3 className="text-4xl font-bold text-white mb-1">{stats.codes}</h3>
+            <p className="text-zinc-400 text-sm">Códigos por Vender</p>
+          </Link>
+        </div>
+      )}
+
+      {/* ACCESOS RÁPIDOS */}
+      <div>
+        <h2 className="text-xl font-bold text-white mb-4">Accesos Rápidos</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Link href="/admin/artistas" className="bg-gradient-to-r from-purple-900/40 to-zinc-900 border border-purple-500/20 p-6 rounded-2xl flex items-center gap-4 hover:border-purple-500/50 transition-all">
+            <span className="text-3xl">✨</span>
+            <div>
+              <h3 className="font-bold text-white">Publicar Nuevo Artista</h3>
+              <p className="text-sm text-zinc-400">Sube música, portadas y configura perfiles.</p>
+            </div>
+          </Link>
+          
+          <Link href="/admin/codigos" className="bg-gradient-to-r from-green-900/40 to-zinc-900 border border-green-500/20 p-6 rounded-2xl flex items-center gap-4 hover:border-green-500/50 transition-all">
+            <span className="text-3xl">⚡</span>
+            <div>
+              <h3 className="font-bold text-white">Generar Códigos NFC</h3>
+              <p className="text-sm text-zinc-400">Crea llaves de acceso y descarga los QRs.</p>
+            </div>
+          </Link>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
