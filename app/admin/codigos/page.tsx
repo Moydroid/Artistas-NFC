@@ -62,7 +62,8 @@ export default function AdminCodigos() {
       const codesToInsert: any[] = [];
 
       for (let i = 0; i < quantity; i++) {
-        const code = `FONO-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+        // ✅ ARREGLO: Código sin guiones (ej: FONO8X9Y)
+        const code = `FONO${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
         const access_url = `/acceso/${artist.slug}`;
         const full_url = `https://fonotap.vercel.app${access_url}`;
         
@@ -235,9 +236,9 @@ export default function AdminCodigos() {
               <div className="bg-black/50 p-4 rounded-lg border border-zinc-800 max-h-96 overflow-y-auto space-y-3">
                 {codes.map((item: any, i: number) => (
                   <div key={i} className="bg-zinc-900 p-4 rounded-lg border border-zinc-700">
-                    {/* CÓDIGO ALFANUMÉRICO CON BOTÓN DE COPIAR */}
+                    {/* CÓDIGO ALFANUMÉRICO SIN GUIONES */}
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="flex-1 bg-zinc-800 border border-purple-500/30 rounded-lg px-4 py-3 font-mono text-purple-400 text-lg font-bold">
+                      <div className="flex-1 bg-zinc-800 border border-purple-500/30 rounded-lg px-4 py-3 font-mono text-purple-400 text-lg font-bold tracking-wider">
                         {item.code}
                       </div>
                       <button 

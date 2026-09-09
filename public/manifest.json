@@ -1,0 +1,22 @@
+{
+  "name": "FONOTAP - Música Exclusiva",
+  "short_name": "FONOTAP",
+  "description": "Tarjetas inteligentes NFC y QR que desbloquean contenido exclusivo.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#9333ea",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

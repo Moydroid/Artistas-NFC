@@ -9,6 +9,7 @@ export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
+  const [selectedArtist, setSelectedArtist] = useState<any>(null); // Para el modal VIP
   const audioRef = useRef<HTMLAudioElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -49,13 +50,19 @@ export default function Home() {
     if (timerRef.current) clearTimeout(timerRef.current);
   };
 
+  // Función para abrir el modal VIP cuando tocan una portada
+  const openVipModal = (artist: any) => {
+    setSelectedArtist(artist);
+    setShowScanModal(false); // Cerrar otros modales si están abiertos
+  };
+
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white overflow-x-hidden relative">
       {previewTrack && (
         <audio ref={audioRef} src={previewTrack.audio_url} onEnded={() => { setIsPlaying(false); setShowModal(true); }} />
       )}
 
-      {/* NAVBAR (Sin botón de Admin visible para el público) */}
+      {/* NAVBAR */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-6 md:px-12 py-5 bg-black/80 backdrop-blur-md border-b border-purple-500/20">
         <div className="flex items-center gap-3">
           <img src="/logo.png" alt="FONOTAP" className="w-12 h-12 object-contain" />
@@ -68,35 +75,48 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* HERO SECTION */}
+      {/* HERO SECTION CON COLLAGE DINÁMICO (MURO DE LA FAMA) */}
       <section className="relative flex flex-col items-center justify-center text-center px-4 pt-32 pb-20 md:pt-40 md:pb-32">
-        <div className="flex justify-center mb-8">
-          <img src="/logo.png" alt="FONOTAP Logo" className="w-64 md:w-80 lg:w-96 object-contain drop-shadow-[0_0_40px_rgba(168,85,247,0.3)]" />
-        </div>
-        <h1 className="text-5xl md:text-7xl font-black mb-6 tracking-tight">
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">Tu música,</span><br />
-          <span className="text-white">en sus manos.</span>
-        </h1>
-        <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mb-4 leading-relaxed">
-          Tarjetas inteligentes <span className="text-purple-400 font-bold">NFC</span> y <span className="text-purple-400 font-bold">QR</span> que desbloquean contenido exclusivo.
-        </p>
-        <p className="text-sm md:text-base text-zinc-500 tracking-[0.3em] uppercase mb-10">Conecta. Comparte. Crece.</p>
         
-        <div className="flex flex-col md:flex-row gap-4 justify-center">
-          <a href={whatsappUrl} target="_blank" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-4 rounded-full font-bold text-lg hover:from-purple-500 hover:to-pink-500 transition-all shadow-[0_0_30px_rgba(168,85,247,0.4)]">
-            💬 Quiero mis tarjetas
-          </a>
-          <button onClick={() => setShowScanModal(true)} className="border border-zinc-600 bg-zinc-900/50 backdrop-blur-md px-8 py-4 rounded-full font-bold text-lg text-white hover:bg-zinc-800 hover:border-purple-500/50 transition-all flex items-center justify-center gap-2">
-            🔓 Ya tengo mi tarjeta
-          </button>
-          <Link href="#artistas" className="border border-purple-500/30 bg-black/50 backdrop-blur-md px-8 py-4 rounded-full font-bold text-lg text-purple-400 hover:bg-purple-600/10 transition-all">
-            Ver artistas
-          </Link>
+        {/* Collage de fondo (Efecto Bóveda VIP) */}
+        <div className="absolute inset-0 z-0 overflow-hidden opacity-30 pointer-events-none">
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-2 p-4 h-full w-full blur-sm scale-110">
+            {artists.length > 0 ? artists.map((artist, i) => (
+              <img key={i} src={artist.cover_url || 'https://via.placeholder.com/400'} className="w-full h-full object-cover rounded-lg" />
+            )) : Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="w-full h-full bg-zinc-800 rounded-lg" />
+            ))}
+          </div>
+          {/* Capa oscura para que el texto resalte */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/80 to-[#0a0a0a]" />
+        </div>
+
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="flex justify-center mb-8">
+            <img src="/logo.png" alt="FONOTAP Logo" className="w-64 md:w-80 lg:w-96 object-contain drop-shadow-[0_0_40px_rgba(168,85,247,0.3)]" />
+          </div>
+          <h1 className="text-5xl md:text-7xl font-black mb-6 tracking-tight">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">Tu música,</span><br />
+            <span className="text-white">en sus manos.</span>
+          </h1>
+          <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mb-4 leading-relaxed">
+            Tarjetas inteligentes <span className="text-purple-400 font-bold">NFC</span> y <span className="text-purple-400 font-bold">QR</span> que desbloquean contenido exclusivo.
+          </p>
+          <p className="text-sm md:text-base text-zinc-500 tracking-[0.3em] uppercase mb-10">Conecta. Comparte. Crece.</p>
+          
+          <div className="flex flex-col md:flex-row gap-4 justify-center">
+            <a href={whatsappUrl} target="_blank" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-4 rounded-full font-bold text-lg hover:from-purple-500 hover:to-pink-500 transition-all shadow-[0_0_30px_rgba(168,85,247,0.4)]">
+              💬 Quiero mis tarjetas
+            </a>
+            <button onClick={() => setShowScanModal(true)} className="border border-zinc-600 bg-zinc-900/50 backdrop-blur-md px-8 py-4 rounded-full font-bold text-lg text-white hover:bg-zinc-800 hover:border-purple-500/50 transition-all flex items-center justify-center gap-2">
+              🔓 Ya tengo mi tarjeta
+            </button>
+          </div>
         </div>
       </section>
 
-      {/* SECCIÓN DE PREVIEWS */}
-      <section className="py-20 px-4 border-t border-purple-500/10">
+      {/* SECCIÓN DE PREVIEWS (Fragmentos) */}
+      <section className="py-20 px-4 border-t border-purple-500/10 relative z-10 bg-[#0a0a0a]">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-5xl font-bold mb-4">Escucha un <span className="text-purple-400">Fragmento</span></h2>
@@ -111,7 +131,7 @@ export default function Home() {
                 {previewTrack?.artist_name === artist.name && isPlaying ? (
                   <button onClick={stopPreview} className="w-full bg-red-600 hover:bg-red-700 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors">⏸ Detener</button>
                 ) : (
-                  <button onClick={() => playPreview(artist)} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all">▶ Escuchar</button>
+                  <button onClick={() => playPreview(artist)} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all">▶ Escuchar Fragmento</button>
                 )}
               </div>
             ))}
@@ -120,7 +140,7 @@ export default function Home() {
       </section>
 
       {/* CÓMO FUNCIONA */}
-      <section className="py-20 px-4 border-t border-purple-500/10">
+      <section className="py-20 px-4 border-t border-purple-500/10 relative z-10 bg-[#0a0a0a]">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-5xl font-bold text-center mb-4">Tan simple como <span className="text-purple-400">1, 2, 3</span></h2>
           <p className="text-center text-zinc-500 mb-16 tracking-widest uppercase text-sm">NFC | QR</p>
@@ -140,24 +160,39 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ARTISTAS */}
-      <section id="artistas" className="py-20 px-4 border-t border-purple-500/10">
+      {/* COLECCIÓN EXCLUSIVA (MURO DE LA FAMA CON EFECTO VIP) */}
+      <section className="py-20 px-4 border-t border-purple-500/10 relative z-10 bg-[#0a0a0a]">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl md:text-5xl font-bold text-center mb-4">Artistas FONOTAP</h2>
-          <p className="text-center text-zinc-500 mb-12 tracking-widest uppercase text-sm">Los pioneros de la nueva era</p>
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-5xl font-bold mb-4">Colección <span className="text-purple-400">Exclusiva</span></h2>
+            <p className="text-zinc-400 text-lg max-w-2xl mx-auto">Artistas que ya forman parte de la revolución FONOTAP. Contenido 100% privado.</p>
+          </div>
+          
           {artists.length === 0 ? (
             <div className="text-center py-20 border border-dashed border-purple-500/20 rounded-2xl"><p className="text-zinc-600 text-lg">Próximamente más artistas...</p></div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {artists.map(artist => (
-                <Link key={artist.id} href={`/acceso/${artist.slug}`} className="group relative aspect-[4/5] overflow-hidden rounded-2xl border border-purple-500/20 bg-black hover:border-purple-500/50 transition-all">
+                <div 
+                  key={artist.id} 
+                  onClick={() => openVipModal(artist)}
+                  className="group relative aspect-[4/5] overflow-hidden rounded-2xl border border-purple-500/20 bg-black cursor-pointer hover:border-purple-500/50 transition-all"
+                >
                   <img src={artist.cover_url || 'https://via.placeholder.com/400'} alt={artist.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-6">
-                    <h3 className="text-2xl font-bold text-white mb-1">{artist.name}</h3>
-                    <p className="text-purple-400 text-sm font-medium flex items-center gap-2"><span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> Toca para desbloquear</p>
+                  
+                  {/* Capa oscura y candado (Efecto Anti-Spotify) */}
+                  <div className="absolute inset-0 bg-black/60 group-hover:bg-black/40 transition-all flex flex-col items-center justify-center">
+                    <div className="text-5xl mb-2 drop-shadow-lg"></div>
+                    <span className="bg-purple-600/90 text-white text-[10px] font-bold px-3 py-1 rounded-full tracking-widest uppercase mb-4">Contenido Privado</span>
                   </div>
-                </Link>
+
+                  <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/80 to-transparent">
+                    <h3 className="text-2xl font-bold text-white mb-1">{artist.name}</h3>
+                    <p className="text-purple-400 text-sm font-medium flex items-center gap-2">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> Toca para desbloquear
+                    </p>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -165,7 +200,7 @@ export default function Home() {
       </section>
 
       {/* CTA FINAL */}
-      <section className="py-32 px-4 text-center border-t border-purple-500/10">
+      <section className="py-32 px-4 text-center border-t border-purple-500/10 relative z-10 bg-[#0a0a0a]">
         <div className="max-w-3xl mx-auto">
           <h2 className="text-4xl md:text-6xl font-black mb-6">¿Listo para el <span className="text-purple-400">siguiente nivel</span>?</h2>
           <p className="text-xl text-zinc-400 mb-10">Deja de ser un link más en su bio. Convierte tu música en un objeto físico coleccionable.</p>
@@ -177,17 +212,17 @@ export default function Home() {
       </section>
 
       {/* FOOTER CON ENLACE DISCRETO */}
-      <footer className="py-10 px-4 border-t border-purple-500/10 text-center relative">
+      <footer className="py-10 px-4 border-t border-purple-500/10 text-center relative bg-[#0a0a0a]">
         <p className="text-zinc-600 text-sm">© 2026 FONOTAP. Todos los derechos reservados.</p>
         <p className="text-zinc-700 text-xs mt-2 tracking-widest uppercase">Conecta. Comparte. Crece.</p>
         
-        {/* Tu puerta trasera: invisible para el público, visible para ti */}
+        {/* Puerta trasera invisible */}
         <Link href="/login" className="absolute bottom-2 right-4 text-[9px] text-zinc-800 hover:text-zinc-500 transition-colors font-mono tracking-widest opacity-50 hover:opacity-100">
           admi
         </Link>
       </footer>
 
-      {/* MODAL DE MARKETING */}
+      {/* MODAL DE MARKETING (Después del fragmento) */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-purple-500/30 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center">
@@ -202,13 +237,40 @@ export default function Home() {
         </div>
       )}
 
+      {/* MODAL VIP (Cuando tocan una portada de la Colección) */}
+      {selectedArtist && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm" onClick={() => setSelectedArtist(null)}>
+          <div className="bg-zinc-900 border border-purple-500/30 rounded-3xl p-8 max-w-md w-full shadow-2xl relative text-center" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setSelectedArtist(null)} className="absolute top-4 right-4 text-zinc-400 hover:text-white text-2xl font-bold">&times;</button>
+            
+            <img src={selectedArtist.cover_url || 'https://via.placeholder.com/400'} className="w-32 h-32 object-cover rounded-2xl mx-auto mb-6 shadow-2xl border-2 border-purple-500/50" />
+            
+            <div className="text-4xl mb-2">🔒</div>
+            <h3 className="text-2xl font-bold text-white mb-2">Contenido Bloqueado</h3>
+            <p className="text-zinc-400 text-sm mb-6">
+              La música de <span className="text-purple-400 font-bold">{selectedArtist.name}</span> es 100% exclusiva. 
+              Solo los propietarios de su tarjeta física FONOTAP pueden acceder a su reproductor privado.
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <a href={whatsappUrl} target="_blank" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2">
+                💬 Quiero comprar mi tarjeta
+              </a>
+              <button onClick={() => { setSelectedArtist(null); setShowScanModal(true); }} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl font-medium transition-colors border border-zinc-700">
+                🔓 Ya tengo mi tarjeta (Ingresar código)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* BOTÓN FLOTANTE */}
-      <button onClick={() => setShowScanModal(true)} className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-black/80 backdrop-blur-md border border-purple-500/40 text-white px-4 py-3 rounded-full shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:scale-105 transition-transform cursor-pointer" style={{ animation: 'gentleBounce 3s ease-in-out infinite' }}>
+      <button onClick={() => setShowScanModal(true)} className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-black/80 backdrop-blur-md border border-purple-500/40 text-white px-4 py-3 rounded-full shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:scale-105 transition-transform cursor-pointer" style={{ animation: 'gentleBounce 3s ease-in-out infinite' }}>
         <span className="text-xl">📱</span>
         <span className="text-xs sm:text-sm font-medium tracking-wide">¿Cómo uso mi tarjeta?</span>
       </button>
 
-      {/* MODAL EXPLICATIVO */}
+      {/* MODAL EXPLICATIVO (Cómo usar la tarjeta) */}
       {showScanModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm" onClick={() => setShowScanModal(false)}>
           <div className="bg-zinc-900 border border-purple-500/30 rounded-3xl p-8 max-w-md w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>

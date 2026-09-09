@@ -33,8 +33,8 @@ export default function AdminDashboard() {
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* HEADER */}
       <div>
-        <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Centro de Mando </h1>
-        <p className="text-zinc-400">Bienvenido de nuevo, padrino. Aquí tienes el resumen de tu imperio.</p>
+        <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Centro de Mando 🎛️</h1>
+        <p className="text-zinc-400">Bienvenido de nuevo. Aquí tienes el resumen de tu imperio.</p>
       </div>
 
       {/* TARJETAS DE ESTADÍSTICAS */}
@@ -43,7 +43,7 @@ export default function AdminDashboard() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Tarjeta Artistas */}
-          <Link href="/admin/artistas" className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl hover:border-purple-500/50 transition-all group">
+          <Link href="/admin/artistas" className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl hover:border-purple-500/50 transition-all group cursor-pointer">
             <div className="flex justify-between items-start mb-4">
               <div className="w-12 h-12 bg-purple-600/20 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
                 🎤
@@ -67,7 +67,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Tarjeta Códigos */}
-          <Link href="/admin/codigos" className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl hover:border-green-500/50 transition-all group">
+          <Link href="/admin/codigos" className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl hover:border-green-500/50 transition-all group cursor-pointer">
             <div className="flex justify-between items-start mb-4">
               <div className="w-12 h-12 bg-green-600/20 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
                 🎟️
@@ -84,18 +84,18 @@ export default function AdminDashboard() {
       <div>
         <h2 className="text-xl font-bold text-white mb-4">Accesos Rápidos</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Link href="/admin/artistas" className="bg-gradient-to-r from-purple-900/40 to-zinc-900 border border-purple-500/20 p-6 rounded-2xl flex items-center gap-4 hover:border-purple-500/50 transition-all">
-            <span className="text-3xl">✨</span>
+          <Link href="/admin/artistas" className="bg-gradient-to-r from-purple-900/40 to-zinc-900 border border-purple-500/20 p-6 rounded-2xl flex items-center gap-4 hover:border-purple-500/50 transition-all group">
+            <span className="text-3xl group-hover:scale-110 transition-transform">✨</span>
             <div>
-              <h3 className="font-bold text-white">Publicar Nuevo Artista</h3>
+              <h3 className="font-bold text-white text-lg">Publicar Nuevo Artista</h3>
               <p className="text-sm text-zinc-400">Sube música, portadas y configura perfiles.</p>
             </div>
           </Link>
           
-          <Link href="/admin/codigos" className="bg-gradient-to-r from-green-900/40 to-zinc-900 border border-green-500/20 p-6 rounded-2xl flex items-center gap-4 hover:border-green-500/50 transition-all">
-            <span className="text-3xl">⚡</span>
+          <Link href="/admin/codigos" className="bg-gradient-to-r from-green-900/40 to-zinc-900 border border-green-500/20 p-6 rounded-2xl flex items-center gap-4 hover:border-green-500/50 transition-all group">
+            <span className="text-3xl group-hover:scale-110 transition-transform"></span>
             <div>
-              <h3 className="font-bold text-white">Generar Códigos NFC</h3>
+              <h3 className="font-bold text-white text-lg">Generar Códigos NFC</h3>
               <p className="text-sm text-zinc-400">Crea llaves de acceso y descarga los QRs.</p>
             </div>
           </Link>

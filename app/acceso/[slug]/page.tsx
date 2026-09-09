@@ -1,11 +1,15 @@
 "use client";
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 
 export default function ReproductorPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
+  
+  // ✅ ARREGLO: Detectar si el admin entró con el pase VIP
+  const isAdmin = searchParams.get('admin') === 'true';
   
   const [artist, setArtist] = useState<any>(null);
   const [tracks, setTracks] = useState<any[]>([]);
@@ -14,7 +18,7 @@ export default function ReproductorPage() {
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [accessCode, setAccessCode] = useState('');
-  const [hasAccess, setHasAccess] = useState(false);
+  const [hasAccess, setHasAccess] = useState(isAdmin); // Si es admin, ya tiene acceso
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   
@@ -49,11 +53,9 @@ export default function ReproductorPage() {
     }
   };
 
-  // ✅ LÓGICA DE ACCESO PERMANENTE (Arreglada)
   const verifyAccess = async () => {
     if (!accessCode.trim()) { setError('Ingresa un código'); return; }
     
-    // Buscamos el código SIN importar si ya se usó antes
     const { data, error } = await supabase
       .from('access_codes')
       .select('*')
@@ -66,11 +68,9 @@ export default function ReproductorPage() {
       return; 
     }
 
-    // El código es válido, damos acceso (aunque ya se haya usado antes)
     setHasAccess(true);
     setError('');
     
-    // Solo la PRIMERA vez que se usa, lo marcamos como "activado" para tus estadísticas de venta
     if (!data.is_used) {
       await supabase
         .from('access_codes')
@@ -132,7 +132,8 @@ export default function ReproductorPage() {
   if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-purple-400">Cargando...</div>;
   if (!artist) return <div className="min-h-screen bg-black flex items-center justify-center text-red-400">Artista no encontrado</div>;
 
-  if (!hasAccess) {
+  // ✅ ARREGLO: Si es admin, saltamos la pantalla de código
+  if (!hasAccess && !isAdmin) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-zinc-900/80 backdrop-blur-xl border border-purple-500/20 rounded-3xl p-8 shadow-2xl text-center">
