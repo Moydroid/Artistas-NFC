@@ -21,6 +21,7 @@ export default function ReproductorPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [showTrackList, setShowTrackList] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -47,7 +48,6 @@ export default function ReproductorPage() {
     }
   };
 
-  // ✅ ARREGLO: Forzar reproducción cuando cambia el índice
   useEffect(() => {
     if (audioRef.current && isPlaying) {
       audioRef.current.play().catch(() => setIsPlaying(false));
@@ -97,13 +97,29 @@ export default function ReproductorPage() {
     setShowTrackList(false);
   };
 
-  const downloadTrack = () => {
+  const initiateDownload = () => setShowDownloadModal(true);
+
+  const confirmDownload = () => {
     const track = tracks[currentTrackIndex];
     if (track?.audio_url && artist) {
-      const link = document.createElement('a');
-      link.href = track.audio_url;
-      link.download = `${artist.name} - ${track.title}.mp3`;
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      fetch(track.audio_url)
+        .then(response => response.blob())
+        .then(blob => {
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${artist.name} - ${track.title}.mp3`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          setShowDownloadModal(false);
+        })
+        .catch(error => {
+          console.error('Error al descargar:', error);
+          alert('Error al descargar. Intenta de nuevo.');
+          setShowDownloadModal(false);
+        });
     }
   };
 
@@ -130,7 +146,7 @@ export default function ReproductorPage() {
   return (
     <div className="h-screen w-full relative overflow-hidden bg-black">
       
-      {/* 1. VIDEO DE FONDO (Liberado y optimizado) */}
+      {/* 1. VIDEO DE FONDO */}
       {artist.canvas_url ? (
         <video 
           autoPlay loop muted playsInline preload="auto"
@@ -145,7 +161,7 @@ export default function ReproductorPage() {
         </div>
       )}
 
-      {/* Capa oscura muy sutil para que el texto se lea, pero deje ver el video */}
+      {/* Capa oscura sutil */}
       <div className="fixed inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" style={{ zIndex: 1 }} />
 
       {/* 2. CONTENIDO FLOTANTE */}
@@ -166,7 +182,8 @@ export default function ReproductorPage() {
               <h2 className="text-base font-bold text-white truncate">{currentTrack?.title || 'Sin titulo'}</h2>
               <p className="text-sm text-purple-300 truncate">{artist.name}</p>
             </div>
-            <button onClick={downloadTrack} className="text-zinc-400 hover:text-white p-2">
+            {/* Botón de descarga */}
+            <button onClick={initiateDownload} className="text-zinc-400 hover:text-white p-2 transition-colors" title="Descargar canción">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
             </button>
           </div>
@@ -204,7 +221,7 @@ export default function ReproductorPage() {
           </div>
         </div>
 
-        {/* Botón para ver lista (si hay más de 1 canción) */}
+        {/* Botón para ver lista */}
         {tracks.length > 1 && !showTrackList && (
           <button onClick={() => setShowTrackList(true)} className="text-center text-xs text-white/60 hover:text-white mb-2">
             Ver lista de canciones ({tracks.length})
@@ -230,6 +247,39 @@ export default function ReproductorPage() {
                   {index === currentTrackIndex && isPlaying && <span className="text-purple-400 text-xs">Reproduciendo</span>}
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. MODAL DE CONFIRMACIÓN DE DESCARGA */}
+      {showDownloadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setShowDownloadModal(false)}>
+          <div className="bg-zinc-900/95 backdrop-blur-xl border border-white/20 rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">¿Descargar canción?</h3>
+              <p className="text-sm text-zinc-400 mb-6 truncate">
+                {currentTrack?.title} - {artist.name}
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowDownloadModal(false)}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={confirmDownload}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-purple-600/20"
+                >
+                  Descargar
+                </button>
+              </div>
             </div>
           </div>
         </div>
