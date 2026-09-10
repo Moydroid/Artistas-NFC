@@ -1,11 +1,10 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'FONOTAP | Tu música, en sus manos',
   description: 'Tarjetas inteligentes NFC y QR para artistas.',
   manifest: '/manifest.json',
-  themeColor: '#9333ea',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -13,13 +12,19 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: '#9333ea',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#9333ea" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <link rel="apple-touch-icon" href="/logo.png" />
       </head>
       <body className="bg-[#0a0a0a] text-white antialiased">
         {children}
