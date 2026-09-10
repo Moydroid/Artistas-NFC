@@ -16,17 +16,19 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
-      setError(error.message);
+      console.error("❌ Error de Supabase:", error.message);
+      setError("Correo o contraseña incorrectos: " + error.message);
       setLoading(false);
     } else {
-      // Redirigir directamente al admin al iniciar sesión correctamente
-      router.push('/admin');
+      console.log("✅ Login exitoso, redirigiendo...", data);
+      // Forzamos la redirección al admin
+      router.replace('/admin');
     }
   };
 
@@ -48,7 +50,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@fonotap.com"
+              placeholder="tu-correo@ejemplo.com"
               className="w-full p-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-purple-500 transition-colors"
               required
             />
@@ -77,7 +79,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-purple-600/20"
           >
-            {loading ? 'Entrando...' : '🔓 Ingresar'}
+            {loading ? 'Verificando...' : '🔓 Ingresar'}
           </button>
         </form>
 
