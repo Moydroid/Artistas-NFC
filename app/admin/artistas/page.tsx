@@ -3,13 +3,6 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
-type TrackStatus = 'idle' | 'uploading' | 'success' | 'error';
-interface AlbumTrack {
-  id: string; title: string; composer: string; percentage: number;
-  audio_file: File | null; cover_file: File | null; status: TrackStatus; message: string;
-}
-
-// ✅ ARREGLO 1: Función para generar slugs limpios (quita acentos, cambia ñ por n)
 const normalizeSlug = (text: string) => {
   return text
     .toLowerCase()
@@ -22,33 +15,31 @@ const normalizeSlug = (text: string) => {
 
 export default function AdminPublicar() {
   const router = useRouter();
-  const [publishMode, setPublishMode] = useState<'single' | 'album'>('single');
-  const [copiedArtist, setCopiedArtist] = useState<string | null>(null);
-  const [showTrash, setShowTrash] = useState(false);
-  
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState('');
   const [artists, setArtists] = useState<any[]>([]);
+  const [selectedArtist, setSelectedArtist] = useState<any>(null);
+  const [tracks, setTracks] = useState<any[]>([]);
+  const [showTrash, setShowTrash] = useState(false);
+  const [copiedArtist, setCopiedArtist] = useState<string | null>(null);
+  
+  // Estados para crear/editar artista
+  const [showArtistForm, setShowArtistForm] = useState(false);
   const [editingArtist, setEditingArtist] = useState<any>(null);
-  const [formData, setFormData] = useState({
-    artist_name: '', artist_slug: '', short_bio: '', instagram_url: '',
-    cover_file: null as File | null, canvas_file: null as File | null,
-    track_title: '', audio_file: null as File | null, composer_name: '', composer_percentage: 0,
-  });
-
-  const [albumArtistMode, setAlbumArtistMode] = useState<'existing' | 'new'>('existing');
-  const [selectedArtistId, setSelectedArtistId] = useState('');
-  const [newArtistData, setNewArtistData] = useState({
+  const [artistForm, setArtistForm] = useState({
     name: '', slug: '', short_bio: '', instagram_url: '',
-    cover_file: null as File | null, canvas_file: null as File | null
+    cover_file: null as File | null, canvas_file: null as File | null,
   });
-  const [albumTracks, setAlbumTracks] = useState<AlbumTrack[]>([
-    { id: crypto.randomUUID(), title: '', composer: '', percentage: 0, audio_file: null, cover_file: null, status: 'idle', message: '' }
-  ]);
-  const [albumLoading, setAlbumLoading] = useState(false);
+  const [artistLoading, setArtistLoading] = useState(false);
 
-  // ✅ ESTADOS PARA EL REPRODUCTOR DE MONITOREO (QA)
+  // Estados para crear/editar canción
+  const [showTrackForm, setShowTrackForm] = useState(false);
+  const [editingTrack, setEditingTrack] = useState<any>(null);
+  const [trackForm, setTrackForm] = useState({
+    title: '', audio_file: null as File | null, cover_file: null as File | null,
+    composer_name: '', composer_percentage: 0,
+  });
+  const [trackLoading, setTrackLoading] = useState(false);
+
+  // QA Player
   const [qaArtist, setQaArtist] = useState<any>(null);
   const [qaTracks, setQaTracks] = useState<any[]>([]);
   const [qaTrackIndex, setQaTrackIndex] = useState(0);
@@ -60,6 +51,11 @@ export default function AdminPublicar() {
   const fetchArtists = async () => {
     const { data } = await supabase.from('artists').select('*').order('created_at', { ascending: false });
     if (data) setArtists(data);
+  };
+
+  const fetchTracks = async (artistId: string) => {
+    const { data } = await supabase.from('tracks').select('*').eq('artist_id', artistId).order('created_at', { ascending: true });
+    if (data) setTracks(data);
   };
 
   const uploadFile = async (file: File, bucket: string): Promise<string> => {
@@ -75,160 +71,141 @@ export default function AdminPublicar() {
 
   const copyArtistLink = async (artist: any) => {
     const link = `https://fonotap.vercel.app/acceso/${artist.slug}`;
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopiedArtist(artist.id);
-      setTimeout(() => setCopiedArtist(null), 2000);
-    } catch (error) {
-      const textArea = document.createElement('textarea');
-      textArea.value = link;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      setCopiedArtist(artist.id);
-      setTimeout(() => setCopiedArtist(null), 2000);
+    try { await navigator.clipboard.writeText(link); } catch {
+      const t = document.createElement('textarea'); t.value = link; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t);
     }
+    setCopiedArtist(artist.id); setTimeout(() => setCopiedArtist(null), 2000);
   };
 
-  const editArtist = async (artist: any) => {
-    setEditingArtist(artist);
-    let trackTitle = '';
-    let composerName = '';
-    let composerPercentage = 0;
-    try {
-      const { data: tracks } = await supabase.from('tracks').select('title, composer_name, composer_percentage').eq('artist_id', artist.id).order('created_at', { ascending: true }).limit(1).single();
-      if (tracks) { trackTitle = tracks.title || ''; composerName = tracks.composer_name || ''; composerPercentage = tracks.composer_percentage || 0; }
-    } catch (error) { console.log("No se encontró canción o error:", error); }
+  // ===== GESTIÓN DE ARTISTAS =====
+  const openArtistForm = (artist?: any) => {
+    if (artist) {
+      setEditingArtist(artist);
+      setArtistForm({
+        name: artist.name, slug: artist.slug, short_bio: artist.short_bio || '',
+        instagram_url: artist.instagram_url || '', cover_file: null, canvas_file: null,
+      });
+    } else {
+      setEditingArtist(null);
+      setArtistForm({ name: '', slug: '', short_bio: '', instagram_url: '', cover_file: null, canvas_file: null });
+    }
+    setShowArtistForm(true);
+    setShowTrackForm(false);
+  };
 
-    setFormData({
-      artist_name: artist.name, artist_slug: artist.slug, short_bio: artist.short_bio || '',
-      instagram_url: artist.instagram_url || '', cover_file: null, canvas_file: null,
-      track_title: trackTitle, audio_file: null, composer_name: composerName, composer_percentage: composerPercentage,
-    });
-    setStep(1);
-    setStatus('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const saveArtist = async () => {
+    if (!artistForm.name || !artistForm.slug) { alert('Nombre y slug son obligatorios'); return; }
+    setArtistLoading(true);
+    try {
+      let coverUrl = editingArtist?.cover_url || '';
+      if (artistForm.cover_file) coverUrl = await uploadFile(artistForm.cover_file, 'artist-covers');
+      let canvasUrl = editingArtist?.canvas_url || '';
+      if (artistForm.canvas_file) canvasUrl = await uploadFile(artistForm.canvas_file, 'videos');
+
+      if (editingArtist) {
+        await supabase.from('artists').update({
+          name: artistForm.name, slug: artistForm.slug, short_bio: artistForm.short_bio,
+          instagram_url: artistForm.instagram_url, cover_url: coverUrl, canvas_url: canvasUrl,
+        }).eq('id', editingArtist.id);
+      } else {
+        await supabase.from('artists').insert([{
+          name: artistForm.name, slug: artistForm.slug, short_bio: artistForm.short_bio,
+          instagram_url: artistForm.instagram_url, cover_url: coverUrl, canvas_url: canvasUrl, is_active: true,
+        }]);
+      }
+      await fetchArtists();
+      setShowArtistForm(false);
+    } catch (e: any) { alert('Error: ' + e.message); } finally { setArtistLoading(false); }
   };
 
   const deleteArtist = async (artist: any) => {
-    const confirmacion = window.confirm(`⚠️ ¿Mandar a "${artist.name}" a la papelera?`);
-    if (!confirmacion) return;
+    if (!window.confirm(`¿Mandar a "${artist.name}" a la papelera?`)) return;
     try {
-      const { error } = await supabase.from('artists').update({ is_active: false }).eq('id', artist.id);
-      if (error) throw error;
-      alert(`🗑️ "${artist.name}" enviado a la papelera.`);
-      fetchArtists();
-    } catch (error: any) { alert('❌ Error: ' + error.message); }
+      await supabase.from('artists').update({ is_active: false }).eq('id', artist.id);
+      await fetchArtists();
+      if (selectedArtist?.id === artist.id) { setSelectedArtist(null); setTracks([]); }
+    } catch (e: any) { alert('Error: ' + e.message); }
   };
 
   const restoreArtist = async (artist: any) => {
-    try {
-      const { error } = await supabase.from('artists').update({ is_active: true }).eq('id', artist.id);
-      if (error) throw error;
-      alert(`✅ "${artist.name}" rescatado.`);
-      fetchArtists();
-    } catch (error: any) { alert('❌ Error: ' + error.message); }
+    try { await supabase.from('artists').update({ is_active: true }).eq('id', artist.id); await fetchArtists(); } catch (e: any) { alert('Error: ' + e.message); }
   };
 
   const permanentDelete = async (artist: any) => {
-    const confirmacion = window.confirm(`🚨 ¿BORRAR PERMANENTEMENTE a "${artist.name}"?`);
-    if (!confirmacion) return;
+    if (!window.confirm(`¿BORRAR PERMANENTEMENTE a "${artist.name}"?`)) return;
     try {
       await supabase.from('tracks').delete().eq('artist_id', artist.id);
       await supabase.from('access_codes').delete().eq('artist_id', artist.id);
-      const { error } = await supabase.from('artists').delete().eq('id', artist.id);
-      if (error) throw error;
-      alert(`🗑️ "${artist.name}" borrado.`);
-      fetchArtists();
-    } catch (error: any) { alert('❌ Error: ' + error.message); }
+      await supabase.from('artists').delete().eq('id', artist.id);
+      await fetchArtists();
+    } catch (e: any) { alert('Error: ' + e.message); }
   };
 
-  const handlePublishSingle = async () => {
-    setLoading(true); setStatus('🚀 Iniciando...');
-    try {
-      let coverUrl = editingArtist?.cover_url || '';
-      if (formData.cover_file) { coverUrl = await uploadFile(formData.cover_file, 'artist-covers'); }
-      let canvasUrl = editingArtist?.canvas_url || '';
-      if (formData.canvas_file) { canvasUrl = await uploadFile(formData.canvas_file, 'videos'); }
-
-      let artistId = editingArtist?.id;
-      if (editingArtist) {
-        await supabase.from('artists').update({ name: formData.artist_name, slug: formData.artist_slug, short_bio: formData.short_bio, instagram_url: formData.instagram_url, cover_url: coverUrl, canvas_url: canvasUrl }).eq('id', editingArtist.id);
-      } else {
-        const { data: artistData } = await supabase.from('artists').insert([{ name: formData.artist_name, slug: formData.artist_slug, short_bio: formData.short_bio, instagram_url: formData.instagram_url, cover_url: coverUrl, canvas_url: canvasUrl, is_active: true }]).select().single();
-        artistId = artistData.id;
-      }
-
-      if (formData.audio_file && formData.track_title) {
-        const audioUrl = await uploadFile(formData.audio_file, 'audio');
-        await supabase.from('tracks').insert([{ artist_id: artistId, title: formData.track_title, audio_url: audioUrl, composer_name: formData.composer_name, composer_percentage: formData.composer_percentage }]);
-      }
-
-      setStatus(editingArtist ? '✅ Actualizado' : '✅ Publicado');
-      fetchArtists();
-      setTimeout(() => {
-        setFormData({ artist_name: '', artist_slug: '', short_bio: '', instagram_url: '', cover_file: null, canvas_file: null, track_title: '', audio_file: null, composer_name: '', composer_percentage: 0 });
-        setEditingArtist(null); setStep(1); setStatus('');
-      }, 3000);
-    } catch (error: any) { setStatus('❌ Error: ' + error.message); } finally { setLoading(false); }
+  // ===== GESTIÓN DE CANCIONES =====
+  const selectArtist = async (artist: any) => {
+    setSelectedArtist(artist);
+    await fetchTracks(artist.id);
+    setShowArtistForm(false);
+    setShowTrackForm(false);
   };
 
-  const addTrack = () => setAlbumTracks([...albumTracks, { id: crypto.randomUUID(), title: '', composer: '', percentage: 0, audio_file: null, cover_file: null, status: 'idle', message: '' }]);
-  const removeTrack = (index: number) => setAlbumTracks(albumTracks.filter((_, i) => i !== index));
-  
-  const publishAlbum = async () => {
-    let finalArtistId = selectedArtistId;
-    if (albumArtistMode === 'new') {
-      if (!newArtistData.name || !newArtistData.slug) { alert('⚠️ Pon el nombre y el slug.'); return; }
-      let coverUrl = newArtistData.cover_file ? await uploadFile(newArtistData.cover_file, 'artist-covers') : '';
-      let canvasUrl = newArtistData.canvas_file ? await uploadFile(newArtistData.canvas_file, 'videos') : '';
-      const { data: artistData, error: artistError } = await supabase.from('artists').insert([{ name: newArtistData.name, slug: newArtistData.slug, short_bio: newArtistData.short_bio, instagram_url: newArtistData.instagram_url, cover_url: coverUrl, canvas_url: canvasUrl, is_active: true }]).select().single();
-      if (artistError) { alert('❌ Error: ' + artistError.message); return; }
-      finalArtistId = artistData.id;
-      fetchArtists();
+  const openTrackForm = (track?: any) => {
+    if (track) {
+      setEditingTrack(track);
+      setTrackForm({
+        title: track.title, audio_file: null, cover_file: null,
+        composer_name: track.composer_name || '', composer_percentage: track.composer_percentage || 0,
+      });
     } else {
-      if (!finalArtistId) { alert('⚠️ Selecciona un artista.'); return; }
+      setEditingTrack(null);
+      setTrackForm({ title: '', audio_file: null, cover_file: null, composer_name: '', composer_percentage: 0 });
     }
-    setAlbumLoading(true);
-    let currentTracks = [...albumTracks];
-    const updateTrack = (index: number, field: keyof AlbumTrack, value: any) => { currentTracks[index] = { ...currentTracks[index], [field]: value }; setAlbumTracks([...currentTracks]); };
-    for (let i = 0; i < currentTracks.length; i++) {
-      const track = currentTracks[i];
-      if (!track.audio_file && !track.title) { updateTrack(i, 'status', 'idle'); continue; }
-      updateTrack(i, 'status', 'uploading'); updateTrack(i, 'message', 'Subiendo...');
-      try {
-        let audioUrl = '', coverUrl = '';
-        if (track.audio_file) {
-          const name = `${Date.now()}-${track.audio_file.name}`;
-          await supabase.storage.from('audio').upload(name, track.audio_file);
-          audioUrl = supabase.storage.from('audio').getPublicUrl(name).data.publicUrl;
-        }
-        if (track.cover_file) {
-          const name = `${Date.now()}-${track.cover_file.name}`;
-          await supabase.storage.from('artist-covers').upload(name, track.cover_file);
-          coverUrl = supabase.storage.from('artist-covers').getPublicUrl(name).data.publicUrl;
-        }
-        await supabase.from('tracks').insert({ artist_id: finalArtistId, title: track.title || 'Sin título', audio_url: audioUrl, cover_url: coverUrl, composer_name: track.composer, composer_percentage: track.percentage });
-        updateTrack(i, 'status', 'success'); updateTrack(i, 'message', '✅ Publicada');
-      } catch (error: any) { updateTrack(i, 'status', 'error'); updateTrack(i, 'message', '❌ ' + error.message); }
-    }
-    setAlbumLoading(false);
-    alert('🎉 ¡Álbum publicado!');
+    setShowTrackForm(true);
+    setShowArtistForm(false);
   };
 
-  // ✅ FUNCIONES DEL REPRODUCTOR QA
+  const saveTrack = async () => {
+    if (!selectedArtist) return;
+    if (!trackForm.title) { alert('El título es obligatorio'); return; }
+    if (!editingTrack && !trackForm.audio_file) { alert('Debes subir un archivo de audio'); return; }
+    
+    setTrackLoading(true);
+    try {
+      let audioUrl = editingTrack?.audio_url || '';
+      if (trackForm.audio_file) audioUrl = await uploadFile(trackForm.audio_file, 'audio');
+      let coverUrl = editingTrack?.cover_url || '';
+      if (trackForm.cover_file) coverUrl = await uploadFile(trackForm.cover_file, 'artist-covers');
+
+      if (editingTrack) {
+        await supabase.from('tracks').update({
+          title: trackForm.title, audio_url: audioUrl, cover_url: coverUrl,
+          composer_name: trackForm.composer_name, composer_percentage: trackForm.composer_percentage,
+        }).eq('id', editingTrack.id);
+      } else {
+        await supabase.from('tracks').insert([{
+          artist_id: selectedArtist.id, title: trackForm.title, audio_url: audioUrl, cover_url: coverUrl,
+          composer_name: trackForm.composer_name, composer_percentage: trackForm.composer_percentage,
+        }]);
+      }
+      await fetchTracks(selectedArtist.id);
+      setShowTrackForm(false);
+    } catch (e: any) { alert('Error: ' + e.message); } finally { setTrackLoading(false); }
+  };
+
+  const deleteTrack = async (track: any) => {
+    if (!window.confirm(`¿Eliminar la canción "${track.title}"?`)) return;
+    try {
+      await supabase.from('tracks').delete().eq('id', track.id);
+      await fetchTracks(selectedArtist.id);
+    } catch (e: any) { alert('Error: ' + e.message); }
+  };
+
+  // ===== QA PLAYER =====
   const openQaPlayer = async (artist: any) => {
     setQaArtist(artist);
     const { data } = await supabase.from('tracks').select('*').eq('artist_id', artist.id).order('created_at', { ascending: true });
-    if (data && data.length > 0) {
-      setQaTracks(data);
-      setQaTrackIndex(0);
-      setQaIsPlaying(false);
-    } else {
-      setQaTracks([]);
-      alert('Este artista aún no tiene canciones subidas.');
-    }
+    if (data && data.length > 0) { setQaTracks(data); setQaTrackIndex(0); setQaIsPlaying(false); }
+    else { setQaTracks([]); alert('Este artista aún no tiene canciones.'); }
   };
 
   const toggleQaPlay = () => {
@@ -239,256 +216,196 @@ export default function AdminPublicar() {
     }
   };
 
-  const nextQaTrack = () => {
-    setQaTrackIndex((prev) => (prev + 1) % qaTracks.length);
-    setQaIsPlaying(true);
-  };
-
-  const prevQaTrack = () => {
-    setQaTrackIndex((prev) => (prev - 1 + qaTracks.length) % qaTracks.length);
-    setQaIsPlaying(true);
-  };
-
   return (
     <main className="min-h-screen bg-black text-white p-8">
-      <div className="max-w-4xl mx-auto">
-        
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-6 text-purple-400">Centro de Publicación</h1>
-          <div className="inline-flex bg-zinc-900 p-1 rounded-xl border border-zinc-800">
-            <button onClick={() => setPublishMode('single')} className={`px-8 py-3 rounded-lg font-bold transition-all ${publishMode === 'single' ? 'bg-purple-600 text-white shadow-lg' : 'text-zinc-400 hover:text-white'}`}>🎤 Sencillo</button>
-            <button onClick={() => setPublishMode('album')} className={`px-8 py-3 rounded-lg font-bold transition-all ${publishMode === 'album' ? 'bg-purple-600 text-white shadow-lg' : 'text-zinc-400 hover:text-white'}`}>💿 Álbum</button>
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold text-purple-400">🎛️ Centro de Administración</h1>
+          <button onClick={() => router.push('/admin/codigos')} className="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-bold">🎟️ Generar Códigos</button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* COLUMNA IZQUIERDA: LISTA DE ARTISTAS */}
+          <div className="lg:col-span-1">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Artistas</h2>
+                <button onClick={() => openArtistForm()} className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg font-bold text-sm">+ Nuevo</button>
+              </div>
+              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                {activeArtists.map(artist => (
+                  <div key={artist.id} className={`p-3 rounded-lg cursor-pointer transition-all ${selectedArtist?.id === artist.id ? 'bg-purple-600/20 border border-purple-500/50' : 'bg-zinc-800 hover:bg-zinc-700'}`} onClick={() => selectArtist(artist)}>
+                    <div className="flex items-center gap-3">
+                      <img src={artist.cover_url || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded-lg object-cover" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold truncate">{artist.name}</p>
+                        <p className="text-xs text-zinc-500 truncate">/{artist.slug}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {trashedArtists.length > 0 && (
+                <button onClick={() => setShowTrash(!showTrash)} className="w-full mt-4 bg-zinc-800 hover:bg-zinc-700 py-2 rounded-lg text-sm">🗑️ Papelera ({trashedArtists.length})</button>
+              )}
+            </div>
+          </div>
+
+          {/* COLUMNA DERECHA: DETALLE DEL ARTISTA SELECCIONADO */}
+          <div className="lg:col-span-2">
+            {!selectedArtist && !showArtistForm && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-12 text-center">
+                <p className="text-zinc-500 text-lg">Selecciona un artista o crea uno nuevo</p>
+              </div>
+            )}
+
+            {selectedArtist && !showArtistForm && !showTrackForm && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex items-center gap-4">
+                    <img src={selectedArtist.cover_url || 'https://via.placeholder.com/100'} className="w-24 h-24 rounded-xl object-cover" />
+                    <div>
+                      <h2 className="text-2xl font-bold">{selectedArtist.name}</h2>
+                      <p className="text-zinc-500 text-sm">/{selectedArtist.slug}</p>
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={() => openArtistForm(selectedArtist)} className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">✏️ Editar</button>
+                        <button onClick={() => copyArtistLink(selectedArtist)} className="bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded text-sm">{copiedArtist === selectedArtist.id ? '✅' : '🔗'}</button>
+                        <button onClick={() => openQaPlayer(selectedArtist)} className="bg-zinc-700 hover:bg-zinc-600 px-3 py-1 rounded text-sm">🎧 QA</button>
+                        <button onClick={() => deleteArtist(selectedArtist)} className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm">🗑️</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-zinc-800 pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold">Canciones ({tracks.length})</h3>
+                    <button onClick={() => openTrackForm()} className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg font-bold text-sm">+ Agregar Canción</button>
+                  </div>
+                  {tracks.length === 0 ? (
+                    <p className="text-zinc-500 text-center py-8">No hay canciones aún</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {tracks.map(track => (
+                        <div key={track.id} className="bg-zinc-800 p-4 rounded-lg flex items-center gap-4">
+                          <img src={track.cover_url || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded object-cover" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold truncate">{track.title}</p>
+                            {track.composer_name && <p className="text-xs text-zinc-500">Compositor: {track.composer_name} ({track.composer_percentage}%)</p>}
+                          </div>
+                          <button onClick={() => openTrackForm(track)} className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">✏️</button>
+                          <button onClick={() => deleteTrack(track)} className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm">🗑️</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {showArtistForm && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                <h2 className="text-2xl font-bold mb-6">{editingArtist ? 'Editar Artista' : 'Nuevo Artista'}</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold text-purple-400 mb-1">Nombre</label>
+                    <input type="text" value={artistForm.name} onChange={e => setArtistForm({...artistForm, name: e.target.value, slug: normalizeSlug(e.target.value)})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-500 mb-1">Slug (URL)</label>
+                    <input type="text" value={artistForm.slug} onChange={e => setArtistForm({...artistForm, slug: normalizeSlug(e.target.value)})} className="w-full p-3 bg-zinc-800/50 rounded border border-zinc-700 text-zinc-400 font-mono text-sm" />
+                  </div>
+                  <textarea placeholder="Biografía" value={artistForm.short_bio} onChange={e => setArtistForm({...artistForm, short_bio: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700 h-24" />
+                  <input type="text" placeholder="Instagram" value={artistForm.instagram_url} onChange={e => setArtistForm({...artistForm, instagram_url: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
+                  <div>
+                    <label className="block text-sm font-bold text-purple-400 mb-1">🖼️ Portada</label>
+                    <input type="file" accept="image/*" onChange={e => setArtistForm({...artistForm, cover_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-purple-400 mb-1">🎥 Canvas/Video</label>
+                    <input type="file" accept="video/*" onChange={e => setArtistForm({...artistForm, canvas_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
+                  </div>
+                  <div className="flex gap-4">
+                    <button onClick={() => setShowArtistForm(false)} className="flex-1 bg-zinc-700 py-3 rounded font-bold">Cancelar</button>
+                    <button onClick={saveArtist} disabled={artistLoading} className="flex-1 bg-purple-600 hover:bg-purple-700 py-3 rounded font-bold">{artistLoading ? 'Guardando...' : 'Guardar'}</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showTrackForm && selectedArtist && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                <h2 className="text-2xl font-bold mb-6">{editingTrack ? 'Editar Canción' : 'Nueva Canción'}</h2>
+                <div className="space-y-4">
+                  <input type="text" placeholder="Título" value={trackForm.title} onChange={e => setTrackForm({...trackForm, title: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
+                  <div>
+                    <label className="block text-sm font-bold text-purple-400 mb-1">🎵 Audio {editingTrack && '(dejar vacío para mantener el actual)'}</label>
+                    <input type="file" accept="audio/*" onChange={e => setTrackForm({...trackForm, audio_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-purple-400 mb-1">🖼️ Portada {editingTrack && '(dejar vacío para mantener la actual)'}</label>
+                    <input type="file" accept="image/*" onChange={e => setTrackForm({...trackForm, cover_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
+                  </div>
+                  <input type="text" placeholder="Compositor" value={trackForm.composer_name} onChange={e => setTrackForm({...trackForm, composer_name: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
+                  <input type="number" placeholder="Regalía %" value={trackForm.composer_percentage} onChange={e => setTrackForm({...trackForm, composer_percentage: parseInt(e.target.value) || 0})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
+                  <div className="flex gap-4">
+                    <button onClick={() => setShowTrackForm(false)} className="flex-1 bg-zinc-700 py-3 rounded font-bold">Cancelar</button>
+                    <button onClick={saveTrack} disabled={trackLoading} className="flex-1 bg-green-600 hover:bg-green-700 py-3 rounded font-bold">{trackLoading ? 'Guardando...' : 'Guardar'}</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {publishMode === 'single' && (
-          <div className="animate-in fade-in duration-300">
-            <div className="flex gap-2 mb-8">{[1, 2, 3, 4].map((s) => (<div key={s} className={`flex-1 h-2 rounded ${step >= s ? 'bg-purple-600' : 'bg-zinc-800'}`} />))}</div>
-
-            {step === 1 && (
-              <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
-                <h2 className="text-xl font-bold mb-4">Paso 1: Datos del Artista</h2>
-                <div>
-                  <label className="block text-sm font-bold text-purple-400 mb-1">Nombre del Artista</label>
-                  {/* ✅ ARREGLO: Usa normalizeSlug al escribir */}
-                  <input type="text" placeholder="Ej: La Herencina" value={formData.artist_name} onChange={(e) => { const name = e.target.value; setFormData({...formData, artist_name: name, artist_slug: normalizeSlug(name)}); }} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-500 mb-1">Slug (URL) - Se genera solo</label>
-                  <input type="text" value={formData.artist_slug} onChange={e => setFormData({...formData, artist_slug: normalizeSlug(e.target.value)})} className="w-full p-3 bg-zinc-800/50 rounded border border-zinc-700 text-zinc-400 font-mono text-sm" />
-                </div>
-                <textarea placeholder="Biografía corta" value={formData.short_bio} onChange={e => setFormData({...formData, short_bio: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700 h-24" />
-                <input type="text" placeholder="Link de Instagram" value={formData.instagram_url} onChange={e => setFormData({...formData, instagram_url: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
-                <button onClick={() => setStep(2)} className="w-full bg-purple-600 hover:bg-purple-700 py-3 rounded font-bold">Siguiente →</button>
-              </div>
-            )}
-
-            {step === 2 && (
-              <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-6">
-                <h2 className="text-xl font-bold mb-4">Paso 2: Imágenes y Video</h2>
-                <div>
-                  <label className="block text-sm font-bold text-purple-400 mb-1">🖼️ Portada</label>
-                  <input type="file" accept="image/*" onChange={e => setFormData({...formData, cover_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-purple-400 mb-1">🎥 Canvas / Video</label>
-                  <input type="file" accept="video/*" onChange={e => setFormData({...formData, canvas_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
-                </div>
-                <div className="flex gap-4">
-                  <button onClick={() => setStep(1)} className="flex-1 bg-zinc-700 hover:bg-zinc-600 py-3 rounded font-bold">← Atrás</button>
-                  <button onClick={() => setStep(3)} className="flex-1 bg-purple-600 hover:bg-purple-700 py-3 rounded font-bold">Siguiente →</button>
-                </div>
-              </div>
-            )}
-
-            {step === 3 && (
-              <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-6">
-                <h2 className="text-xl font-bold mb-4">Paso 3: Canción</h2>
-                <input type="text" placeholder="Título de la Canción" value={formData.track_title} onChange={e => setFormData({...formData, track_title: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
-                <div>
-                  <label className="block text-sm font-bold text-purple-400 mb-1">🎵 Archivo de Audio</label>
-                  <input type="file" accept="audio/*" onChange={e => setFormData({...formData, audio_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
-                </div>
-                <input type="text" placeholder="Nombre del Compositor" value={formData.composer_name} onChange={e => setFormData({...formData, composer_name: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
-                <input type="number" placeholder="Regalía (%)" value={formData.composer_percentage} onChange={e => setFormData({...formData, composer_percentage: parseInt(e.target.value) || 0})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
-                <div className="flex gap-4">
-                  <button onClick={() => setStep(2)} className="flex-1 bg-zinc-700 hover:bg-zinc-600 py-3 rounded font-bold">← Atrás</button>
-                  <button onClick={() => setStep(4)} className="flex-1 bg-purple-600 hover:bg-purple-700 py-3 rounded font-bold">Revisar →</button>
-                </div>
-              </div>
-            )}
-
-            {step === 4 && (
-              <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
-                <h2 className="text-xl font-bold mb-4">Paso 4: Revisar y Publicar</h2>
-                <div className="bg-zinc-800 p-4 rounded space-y-2 text-sm">
-                  <p><strong>Artista:</strong> {formData.artist_name} <span className="text-zinc-500">(/ {formData.artist_slug})</span></p>
-                  <p><strong>Canción:</strong> {formData.track_title || 'Sin canción'}</p>
-                </div>
-                {status && <p className={`text-center font-bold ${status.includes('✅') ? 'text-green-400' : 'text-red-400'}`}>{status}</p>}
-                {status.includes('✅') && !status.includes('Actualizado') && (
-                  <div className="bg-green-900/20 border border-green-500/30 p-4 rounded-xl text-center space-y-3">
-                    <p className="text-green-400 font-bold text-lg">🎉 ¡Publicado!</p>
-                    <div className="flex flex-col gap-3">
-                      <button onClick={() => window.open(`/acceso/${formData.artist_slug}?admin=true`, '_blank')} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold">👁️ Abrir Reproductor (Modo Jefe)</button>
-                      <button onClick={() => router.push('/admin/codigos')} className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold">🎟️ Generar Códigos →</button>
-                    </div>
+        {showTrash && (
+          <div className="mt-8 bg-zinc-900 border border-red-500/30 rounded-2xl p-6">
+            <h2 className="text-xl font-bold text-red-400 mb-4">🗑️ Papelera</h2>
+            <div className="grid md:grid-cols-2 gap-4">
+              {trashedArtists.map(artist => (
+                <div key={artist.id} className="bg-zinc-800 p-4 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-bold line-through">{artist.name}</p>
+                    <p className="text-xs text-zinc-500">/{artist.slug}</p>
                   </div>
-                )}
-                <div className="flex gap-4">
-                  <button onClick={() => setStep(3)} disabled={loading} className="flex-1 bg-zinc-700 py-3 rounded font-bold">← Atrás</button>
-                  <button onClick={handlePublishSingle} disabled={loading} className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 py-3 rounded font-bold">{loading ? 'Publicando...' : '🚀 PUBLICAR'}</button>
-                </div>
-              </div>
-            )}
-
-            {/* ✅ REPRODUCTOR DE MONITOREO (QA) */}
-            {qaArtist && (
-              <div className="mt-12 bg-gradient-to-r from-zinc-900 to-black border border-purple-500/30 rounded-2xl p-6 shadow-2xl relative">
-                <button onClick={() => { setQaArtist(null); if(audioQaRef.current) audioQaRef.current.pause(); }} className="absolute top-4 right-4 text-zinc-500 hover:text-white text-xl">✕</button>
-                <h3 className="text-lg font-bold text-purple-400 mb-4 flex items-center gap-2">🎧 Sala de Pruebas: {qaArtist.name}</h3>
-                
-                {qaTracks.length > 0 && (
-                  <div className="flex flex-col md:flex-row gap-6 items-center">
-                    <img src={qaArtist.cover_url || 'https://via.placeholder.com/150'} className="w-32 h-32 object-cover rounded-xl shadow-lg border border-purple-500/20" />
-                    <div className="flex-1 w-full">
-                      <p className="text-xl font-bold text-white mb-1">{qaTracks[qaTrackIndex]?.title || 'Sin título'}</p>
-                      <p className="text-sm text-zinc-500 mb-4">Compositor: {qaTracks[qaTrackIndex]?.composer_name || 'N/A'}</p>
-                      
-                      <div className="flex items-center gap-4 mb-4">
-                        <button onClick={prevQaTrack} className="text-zinc-400 hover:text-white"><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg></button>
-                        <button onClick={toggleQaPlay} className="w-12 h-12 bg-purple-600 hover:bg-purple-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-purple-600/30 transition-all">
-                          {qaIsPlaying ? <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" /></svg> : <svg className="w-6 h-6 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>}
-                        </button>
-                        <button onClick={nextQaTrack} className="text-zinc-400 hover:text-white"><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg></button>
-                      </div>
-
-                      <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
-                        {qaTracks.map((track, i) => (
-                          <button key={track.id} onClick={() => { setQaTrackIndex(i); setQaIsPlaying(true); }} className={`w-full text-left p-2 rounded text-sm flex justify-between ${i === qaTrackIndex ? 'bg-purple-600/20 text-purple-300' : 'text-zinc-400 hover:bg-zinc-800'}`}>
-                            <span>{i + 1}. {track.title}</span>
-                            {i === qaTrackIndex && qaIsPlaying && <span className="text-xs">🔊</span>}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <audio ref={audioQaRef} src={qaTracks[qaTrackIndex]?.audio_url} onEnded={nextQaTrack} onPlay={() => setQaIsPlaying(true)} onPause={() => setQaIsPlaying(false)} />
-              </div>
-            )}
-
-            {/* ARTISTAS ACTIVOS */}
-            <div className="mt-12">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Artistas Publicados</h2>
-                {trashedArtists.length > 0 && (<button onClick={() => setShowTrash(!showTrash)} className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2">🗑️ Papelera ({trashedArtists.length})</button>)}
-              </div>
-
-              {activeArtists.length === 0 ? (<div className="text-center py-12 border border-dashed border-zinc-700 rounded-xl"><p className="text-zinc-500">No hay artistas publicados.</p></div>) : (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {activeArtists.map(artist => (
-                    <div key={artist.id} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 relative group">
-                      <img src={artist.cover_url || 'https://via.placeholder.com/200'} className="w-full h-40 object-cover rounded mb-3" />
-                      <h3 className="font-bold">{artist.name}</h3>
-                      <p className="text-xs text-zinc-500 mb-3">/{artist.slug}</p>
-                      <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                        <button onClick={(e) => { e.stopPropagation(); copyArtistLink(artist); }} className={`${copiedArtist === artist.id ? 'bg-green-600' : 'bg-purple-600 hover:bg-purple-700'} p-2 rounded-lg shadow-lg`} title="Copiar enlace">{copiedArtist === artist.id ? '✅' : '🔗'}</button>
-                        <button onClick={(e) => { e.stopPropagation(); router.push('/admin/codigos'); }} className="bg-green-600 hover:bg-green-700 p-2 rounded-lg shadow-lg" title="Códigos">🎟️</button>
-                        <button onClick={(e) => { e.stopPropagation(); editArtist(artist); }} className="bg-blue-600 hover:bg-blue-700 p-2 rounded-lg shadow-lg" title="Editar">✏️</button>
-                        <button onClick={(e) => { e.stopPropagation(); deleteArtist(artist); }} className="bg-red-600 hover:bg-red-700 p-2 rounded-lg shadow-lg" title="Papelera">🗑️</button>
-                      </div>
-                      {/* ✅ BOTÓN DE PRUEBA DE SONIDO */}
-                      <button onClick={() => openQaPlayer(artist)} className="w-full mt-3 bg-zinc-800 hover:bg-purple-600/20 hover:text-purple-400 border border-zinc-700 hover:border-purple-500/50 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2">
-                        🎧 Probar Sonido (QA)
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {showTrash && (
-              <div className="mt-8 bg-zinc-900/50 border border-red-500/30 rounded-xl p-6">
-                <h2 className="text-xl font-bold text-red-400 mb-4">🗑️ Papelera de Reciclaje</h2>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {trashedArtists.map(artist => (
-                    <div key={artist.id} className="bg-zinc-900 p-4 rounded-xl border border-red-500/20 opacity-60 hover:opacity-100 transition-opacity">
-                      <img src={artist.cover_url || 'https://via.placeholder.com/200'} className="w-full h-40 object-cover rounded mb-3 grayscale" />
-                      <h3 className="font-bold line-through">{artist.name}</h3>
-                      <div className="flex gap-2 mt-2">
-                        <button onClick={() => restoreArtist(artist)} className="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded-lg font-bold text-sm">♻️ Rescatar</button>
-                        <button onClick={() => permanentDelete(artist)} className="bg-red-800 hover:bg-red-900 px-3 py-2 rounded-lg text-sm">💀</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {publishMode === 'album' && (
-          <div className="animate-in fade-in duration-300">
-            <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 mb-8">
-              <h2 className="text-xl font-bold mb-4 text-purple-400">1. Configurar Artista</h2>
-              <div className="inline-flex bg-zinc-800 p-1 rounded-lg border border-zinc-700 mb-4">
-                <button onClick={() => setAlbumArtistMode('existing')} className={`px-4 py-2 rounded-md font-bold text-sm ${albumArtistMode === 'existing' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}>📂 Existente</button>
-                <button onClick={() => setAlbumArtistMode('new')} className={`px-4 py-2 rounded-md font-bold text-sm ${albumArtistMode === 'new' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}>🆕 Nuevo</button>
-              </div>
-              {albumArtistMode === 'existing' ? (
-                <select value={selectedArtistId} onChange={e => setSelectedArtistId(e.target.value)} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700 text-white">
-                  <option value="">-- Elige un artista --</option>
-                  {activeArtists.map(artist => (<option key={artist.id} value={artist.id}>{artist.name}</option>))}
-                </select>
-              ) : (
-                // ✅ ARREGLO 2: Agregados los inputs de Portada Principal y Canvas que faltaban aquí
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-purple-400 mb-1">Nombre del Artista *</label>
-                      <input type="text" placeholder="Nombre" value={newArtistData.name} onChange={e => setNewArtistData({...newArtistData, name: e.target.value, slug: normalizeSlug(e.target.value)})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-zinc-500 mb-1">Slug (se genera solo)</label>
-                      <input type="text" value={newArtistData.slug} onChange={e => setNewArtistData({...newArtistData, slug: normalizeSlug(e.target.value)})} className="w-full p-3 bg-zinc-800/50 rounded border border-zinc-700 text-zinc-400 font-mono text-sm" />
-                    </div>
-                    <input type="text" placeholder="Instagram" value={newArtistData.instagram_url} onChange={e => setNewArtistData({...newArtistData, instagram_url: e.target.value})} className="p-3 bg-zinc-800 rounded border border-zinc-700" />
-                    <input type="text" placeholder="Biografía" value={newArtistData.short_bio} onChange={e => setNewArtistData({...newArtistData, short_bio: e.target.value})} className="p-3 bg-zinc-800 rounded border border-zinc-700" />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-purple-400 mb-1">🖼️ Portada Principal del Artista</label>
-                      <input type="file" accept="image/*" onChange={e => setNewArtistData({...newArtistData, cover_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-purple-400 mb-1">🎥 Canvas / Video de Fondo</label>
-                      <input type="file" accept="video/*" onChange={e => setNewArtistData({...newArtistData, canvas_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="space-y-4 mb-8">
-              {albumTracks.map((track, index) => (
-                <div key={track.id} className="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-purple-400">Canción {index + 1}</h3>
-                    <button onClick={() => removeTrack(index)} className="text-red-400 text-sm font-bold">🗑️ Quitar</button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2"><input type="text" placeholder="Título" value={track.title} onChange={e => { const n = [...albumTracks]; n[index].title = e.target.value; setAlbumTracks(n); }} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" /></div>
-                    <div><input type="text" placeholder="Compositor" value={track.composer} onChange={e => { const n = [...albumTracks]; n[index].composer = e.target.value; setAlbumTracks(n); }} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" /></div>
-                    <div><input type="number" placeholder="%" value={track.percentage} onChange={e => { const n = [...albumTracks]; n[index].percentage = parseInt(e.target.value) || 0; setAlbumTracks(n); }} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" /></div>
-                    <div><label className="block text-xs text-purple-400 mb-1">🎵 Audio</label><input type="file" accept="audio/*" onChange={e => { const n = [...albumTracks]; n[index].audio_file = e.target.files?.[0] || null; setAlbumTracks(n); }} className="w-full p-1 bg-zinc-800 rounded border border-zinc-700 text-xs" /></div>
-                    <div><label className="block text-xs text-purple-400 mb-1">🖼️ Portada de esta Canción</label><input type="file" accept="image/*" onChange={e => { const n = [...albumTracks]; n[index].cover_file = e.target.files?.[0] || null; setAlbumTracks(n); }} className="w-full p-1 bg-zinc-800 rounded border border-zinc-700 text-xs" /></div>
+                  <div className="flex gap-2">
+                    <button onClick={() => restoreArtist(artist)} className="bg-green-600 px-3 py-1 rounded text-sm">♻️</button>
+                    <button onClick={() => permanentDelete(artist)} className="bg-red-800 px-3 py-1 rounded text-sm">💀</button>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="flex gap-4">
-              <button onClick={addTrack} disabled={albumLoading} className="flex-1 border-2 border-dashed border-zinc-700 hover:border-purple-500 text-zinc-400 py-4 rounded-xl font-bold">+ Agregar Canción</button>
-              <button onClick={publishAlbum} disabled={albumLoading} className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 py-4 rounded-xl font-bold text-lg">{albumLoading ? 'Publicando...' : '🚀 PUBLICAR ÁLBUM'}</button>
+          </div>
+        )}
+
+        {qaArtist && (
+          <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+            <div className="bg-zinc-900 border border-purple-500/30 rounded-2xl p-6 max-w-2xl w-full relative">
+              <button onClick={() => { setQaArtist(null); if(audioQaRef.current) audioQaRef.current.pause(); }} className="absolute top-4 right-4 text-zinc-500 hover:text-white text-2xl">✕</button>
+              <h3 className="text-xl font-bold text-purple-400 mb-4">🎧 QA: {qaArtist.name}</h3>
+              {qaTracks.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <img src={qaTracks[qaTrackIndex]?.cover_url || qaArtist.cover_url} className="w-24 h-24 rounded-lg object-cover" />
+                    <div className="flex-1">
+                      <p className="text-lg font-bold">{qaTracks[qaTrackIndex]?.title}</p>
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={() => { setQaTrackIndex((p) => (p - 1 + qaTracks.length) % qaTracks.length); setQaIsPlaying(true); }} className="text-zinc-400 hover:text-white">⏮</button>
+                        <button onClick={toggleQaPlay} className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">{qaIsPlaying ? '⏸' : '▶'}</button>
+                        <button onClick={() => { setQaTrackIndex((p) => (p + 1) % qaTracks.length); setQaIsPlaying(true); }} className="text-zinc-400 hover:text-white">⏭</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {qaTracks.map((t, i) => (
+                      <button key={t.id} onClick={() => { setQaTrackIndex(i); setQaIsPlaying(true); }} className={`w-full text-left p-2 rounded text-sm ${i === qaTrackIndex ? 'bg-purple-600/20 text-purple-300' : 'text-zinc-400 hover:bg-zinc-800'}`}>
+                        {i + 1}. {t.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <audio ref={audioQaRef} src={qaTracks[qaTrackIndex]?.audio_url} onEnded={() => { setQaTrackIndex(p => (p+1) % qaTracks.length); setQaIsPlaying(true); }} onPlay={() => setQaIsPlaying(true)} onPause={() => setQaIsPlaying(false)} />
             </div>
           </div>
         )}
