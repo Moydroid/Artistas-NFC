@@ -9,6 +9,17 @@ interface AlbumTrack {
   audio_file: File | null; cover_file: File | null; status: TrackStatus; message: string;
 }
 
+// ✅ ARREGLO 1: Función para generar slugs limpios (quita acentos, cambia ñ por n)
+const normalizeSlug = (text: string) => {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ñ/g, 'n')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
 export default function AdminPublicar() {
   const router = useRouter();
   const [publishMode, setPublishMode] = useState<'single' | 'album'>('single');
@@ -134,7 +145,7 @@ export default function AdminPublicar() {
   };
 
   const handlePublishSingle = async () => {
-    setLoading(true); setStatus(' Iniciando...');
+    setLoading(true); setStatus('🚀 Iniciando...');
     try {
       let coverUrl = editingArtist?.cover_url || '';
       if (formData.cover_file) { coverUrl = await uploadFile(formData.cover_file, 'artist-covers'); }
@@ -169,11 +180,11 @@ export default function AdminPublicar() {
   const publishAlbum = async () => {
     let finalArtistId = selectedArtistId;
     if (albumArtistMode === 'new') {
-      if (!newArtistData.name || !newArtistData.slug) { alert('️ Pon el nombre y el slug.'); return; }
+      if (!newArtistData.name || !newArtistData.slug) { alert('⚠️ Pon el nombre y el slug.'); return; }
       let coverUrl = newArtistData.cover_file ? await uploadFile(newArtistData.cover_file, 'artist-covers') : '';
       let canvasUrl = newArtistData.canvas_file ? await uploadFile(newArtistData.canvas_file, 'videos') : '';
       const { data: artistData, error: artistError } = await supabase.from('artists').insert([{ name: newArtistData.name, slug: newArtistData.slug, short_bio: newArtistData.short_bio, instagram_url: newArtistData.instagram_url, cover_url: coverUrl, canvas_url: canvasUrl, is_active: true }]).select().single();
-      if (artistError) { alert(' Error: ' + artistError.message); return; }
+      if (artistError) { alert('❌ Error: ' + artistError.message); return; }
       finalArtistId = artistData.id;
       fetchArtists();
     } else {
@@ -259,11 +270,12 @@ export default function AdminPublicar() {
                 <h2 className="text-xl font-bold mb-4">Paso 1: Datos del Artista</h2>
                 <div>
                   <label className="block text-sm font-bold text-purple-400 mb-1">Nombre del Artista</label>
-                  <input type="text" placeholder="Ej: La Herencina" value={formData.artist_name} onChange={(e) => { const name = e.target.value; setFormData({...formData, artist_name: name, artist_slug: name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}); }} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
+                  {/* ✅ ARREGLO: Usa normalizeSlug al escribir */}
+                  <input type="text" placeholder="Ej: La Herencina" value={formData.artist_name} onChange={(e) => { const name = e.target.value; setFormData({...formData, artist_name: name, artist_slug: normalizeSlug(name)}); }} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-zinc-500 mb-1">Slug (URL)</label>
-                  <input type="text" value={formData.artist_slug} onChange={e => setFormData({...formData, artist_slug: e.target.value.toLowerCase().replace(/\s+/g, '-')})} className="w-full p-3 bg-zinc-800/50 rounded border border-zinc-700 text-zinc-400 font-mono text-sm" />
+                  <label className="block text-sm font-bold text-zinc-500 mb-1">Slug (URL) - Se genera solo</label>
+                  <input type="text" value={formData.artist_slug} onChange={e => setFormData({...formData, artist_slug: normalizeSlug(e.target.value)})} className="w-full p-3 bg-zinc-800/50 rounded border border-zinc-700 text-zinc-400 font-mono text-sm" />
                 </div>
                 <textarea placeholder="Biografía corta" value={formData.short_bio} onChange={e => setFormData({...formData, short_bio: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700 h-24" />
                 <input type="text" placeholder="Link de Instagram" value={formData.instagram_url} onChange={e => setFormData({...formData, instagram_url: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
@@ -422,7 +434,7 @@ export default function AdminPublicar() {
               <h2 className="text-xl font-bold mb-4 text-purple-400">1. Configurar Artista</h2>
               <div className="inline-flex bg-zinc-800 p-1 rounded-lg border border-zinc-700 mb-4">
                 <button onClick={() => setAlbumArtistMode('existing')} className={`px-4 py-2 rounded-md font-bold text-sm ${albumArtistMode === 'existing' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}>📂 Existente</button>
-                <button onClick={() => setAlbumArtistMode('new')} className={`px-4 py-2 rounded-md font-bold text-sm ${albumArtistMode === 'new' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}> Nuevo</button>
+                <button onClick={() => setAlbumArtistMode('new')} className={`px-4 py-2 rounded-md font-bold text-sm ${albumArtistMode === 'new' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}>🆕 Nuevo</button>
               </div>
               {albumArtistMode === 'existing' ? (
                 <select value={selectedArtistId} onChange={e => setSelectedArtistId(e.target.value)} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700 text-white">
@@ -430,11 +442,30 @@ export default function AdminPublicar() {
                   {activeArtists.map(artist => (<option key={artist.id} value={artist.id}>{artist.name}</option>))}
                 </select>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input type="text" placeholder="Nombre *" value={newArtistData.name} onChange={e => setNewArtistData({...newArtistData, name: e.target.value})} className="p-3 bg-zinc-800 rounded border border-zinc-700" />
-                  <input type="text" placeholder="Slug *" value={newArtistData.slug} onChange={e => setNewArtistData({...newArtistData, slug: e.target.value.toLowerCase().replace(/\s+/g, '-')})} className="p-3 bg-zinc-800 rounded border border-zinc-700" />
-                  <input type="text" placeholder="Instagram" value={newArtistData.instagram_url} onChange={e => setNewArtistData({...newArtistData, instagram_url: e.target.value})} className="p-3 bg-zinc-800 rounded border border-zinc-700" />
-                  <input type="text" placeholder="Bio" value={newArtistData.short_bio} onChange={e => setNewArtistData({...newArtistData, short_bio: e.target.value})} className="p-3 bg-zinc-800 rounded border border-zinc-700" />
+                // ✅ ARREGLO 2: Agregados los inputs de Portada Principal y Canvas que faltaban aquí
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-purple-400 mb-1">Nombre del Artista *</label>
+                      <input type="text" placeholder="Nombre" value={newArtistData.name} onChange={e => setNewArtistData({...newArtistData, name: e.target.value, slug: normalizeSlug(e.target.value)})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Slug (se genera solo)</label>
+                      <input type="text" value={newArtistData.slug} onChange={e => setNewArtistData({...newArtistData, slug: normalizeSlug(e.target.value)})} className="w-full p-3 bg-zinc-800/50 rounded border border-zinc-700 text-zinc-400 font-mono text-sm" />
+                    </div>
+                    <input type="text" placeholder="Instagram" value={newArtistData.instagram_url} onChange={e => setNewArtistData({...newArtistData, instagram_url: e.target.value})} className="p-3 bg-zinc-800 rounded border border-zinc-700" />
+                    <input type="text" placeholder="Biografía" value={newArtistData.short_bio} onChange={e => setNewArtistData({...newArtistData, short_bio: e.target.value})} className="p-3 bg-zinc-800 rounded border border-zinc-700" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-purple-400 mb-1">🖼️ Portada Principal del Artista</label>
+                      <input type="file" accept="image/*" onChange={e => setNewArtistData({...newArtistData, cover_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-purple-400 mb-1">🎥 Canvas / Video de Fondo</label>
+                      <input type="file" accept="video/*" onChange={e => setNewArtistData({...newArtistData, canvas_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -450,7 +481,7 @@ export default function AdminPublicar() {
                     <div><input type="text" placeholder="Compositor" value={track.composer} onChange={e => { const n = [...albumTracks]; n[index].composer = e.target.value; setAlbumTracks(n); }} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" /></div>
                     <div><input type="number" placeholder="%" value={track.percentage} onChange={e => { const n = [...albumTracks]; n[index].percentage = parseInt(e.target.value) || 0; setAlbumTracks(n); }} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" /></div>
                     <div><label className="block text-xs text-purple-400 mb-1">🎵 Audio</label><input type="file" accept="audio/*" onChange={e => { const n = [...albumTracks]; n[index].audio_file = e.target.files?.[0] || null; setAlbumTracks(n); }} className="w-full p-1 bg-zinc-800 rounded border border-zinc-700 text-xs" /></div>
-                    <div><label className="block text-xs text-purple-400 mb-1">️ Portada</label><input type="file" accept="image/*" onChange={e => { const n = [...albumTracks]; n[index].cover_file = e.target.files?.[0] || null; setAlbumTracks(n); }} className="w-full p-1 bg-zinc-800 rounded border border-zinc-700 text-xs" /></div>
+                    <div><label className="block text-xs text-purple-400 mb-1">🖼️ Portada de esta Canción</label><input type="file" accept="image/*" onChange={e => { const n = [...albumTracks]; n[index].cover_file = e.target.files?.[0] || null; setAlbumTracks(n); }} className="w-full p-1 bg-zinc-800 rounded border border-zinc-700 text-xs" /></div>
                   </div>
                 </div>
               ))}
