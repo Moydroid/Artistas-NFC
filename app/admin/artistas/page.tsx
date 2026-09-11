@@ -21,7 +21,6 @@ export default function AdminPublicar() {
   const [showTrash, setShowTrash] = useState(false);
   const [copiedArtist, setCopiedArtist] = useState<string | null>(null);
   
-  // Estados para crear/editar artista
   const [showArtistForm, setShowArtistForm] = useState(false);
   const [editingArtist, setEditingArtist] = useState<any>(null);
   const [artistForm, setArtistForm] = useState({
@@ -30,7 +29,6 @@ export default function AdminPublicar() {
   });
   const [artistLoading, setArtistLoading] = useState(false);
 
-  // Estados para crear/editar canción
   const [showTrackForm, setShowTrackForm] = useState(false);
   const [editingTrack, setEditingTrack] = useState<any>(null);
   const [trackForm, setTrackForm] = useState({
@@ -39,7 +37,6 @@ export default function AdminPublicar() {
   });
   const [trackLoading, setTrackLoading] = useState(false);
 
-  // QA Player
   const [qaArtist, setQaArtist] = useState<any>(null);
   const [qaTracks, setQaTracks] = useState<any[]>([]);
   const [qaTrackIndex, setQaTrackIndex] = useState(0);
@@ -58,8 +55,15 @@ export default function AdminPublicar() {
     if (data) setTracks(data);
   };
 
+  // ✅ ARREGLO: Función para limpiar nombres de archivos y evitar el error "Invalid key"
   const uploadFile = async (file: File, bucket: string): Promise<string> => {
-    const fileName = `${Date.now()}-${file.name}`;
+    const cleanName = file.name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Quita acentos
+      .replace(/[^a-zA-Z0-9._-]/g, "_"); // Cambia espacios y símbolos raros por guión bajo
+    
+    const fileName = `${Date.now()}-${cleanName}`;
+    
     const { error } = await supabase.storage.from(bucket).upload(fileName, file);
     if (error) throw error;
     const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
@@ -77,7 +81,6 @@ export default function AdminPublicar() {
     setCopiedArtist(artist.id); setTimeout(() => setCopiedArtist(null), 2000);
   };
 
-  // ===== GESTIÓN DE ARTISTAS =====
   const openArtistForm = (artist?: any) => {
     if (artist) {
       setEditingArtist(artist);
@@ -141,7 +144,6 @@ export default function AdminPublicar() {
     } catch (e: any) { alert('Error: ' + e.message); }
   };
 
-  // ===== GESTIÓN DE CANCIONES =====
   const selectArtist = async (artist: any) => {
     setSelectedArtist(artist);
     await fetchTracks(artist.id);
@@ -200,7 +202,6 @@ export default function AdminPublicar() {
     } catch (e: any) { alert('Error: ' + e.message); }
   };
 
-  // ===== QA PLAYER =====
   const openQaPlayer = async (artist: any) => {
     setQaArtist(artist);
     const { data } = await supabase.from('tracks').select('*').eq('artist_id', artist.id).order('created_at', { ascending: true });
@@ -225,7 +226,6 @@ export default function AdminPublicar() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* COLUMNA IZQUIERDA: LISTA DE ARTISTAS */}
           <div className="lg:col-span-1">
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
               <div className="flex items-center justify-between mb-4">
@@ -251,7 +251,6 @@ export default function AdminPublicar() {
             </div>
           </div>
 
-          {/* COLUMNA DERECHA: DETALLE DEL ARTISTA SELECCIONADO */}
           <div className="lg:col-span-2">
             {!selectedArtist && !showArtistForm && (
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-12 text-center">
@@ -339,7 +338,7 @@ export default function AdminPublicar() {
                 <div className="space-y-4">
                   <input type="text" placeholder="Título" value={trackForm.title} onChange={e => setTrackForm({...trackForm, title: e.target.value})} className="w-full p-3 bg-zinc-800 rounded border border-zinc-700" />
                   <div>
-                    <label className="block text-sm font-bold text-purple-400 mb-1">🎵 Audio {editingTrack && '(dejar vacío para mantener el actual)'}</label>
+                    <label className="block text-sm font-bold text-purple-400 mb-1"> Audio {editingTrack && '(dejar vacío para mantener el actual)'}</label>
                     <input type="file" accept="audio/*" onChange={e => setTrackForm({...trackForm, audio_file: e.target.files?.[0] || null})} className="w-full p-2 bg-zinc-800 rounded border border-zinc-700 text-sm" />
                   </div>
                   <div>
@@ -360,7 +359,7 @@ export default function AdminPublicar() {
 
         {showTrash && (
           <div className="mt-8 bg-zinc-900 border border-red-500/30 rounded-2xl p-6">
-            <h2 className="text-xl font-bold text-red-400 mb-4">🗑️ Papelera</h2>
+            <h2 className="text-xl font-bold text-red-400 mb-4">️ Papelera</h2>
             <div className="grid md:grid-cols-2 gap-4">
               {trashedArtists.map(artist => (
                 <div key={artist.id} className="bg-zinc-800 p-4 rounded-lg flex items-center justify-between">
@@ -369,8 +368,8 @@ export default function AdminPublicar() {
                     <p className="text-xs text-zinc-500">/{artist.slug}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => restoreArtist(artist)} className="bg-green-600 px-3 py-1 rounded text-sm">♻️</button>
-                    <button onClick={() => permanentDelete(artist)} className="bg-red-800 px-3 py-1 rounded text-sm">💀</button>
+                    <button onClick={() => restoreArtist(artist)} className="bg-green-600 px-3 py-1 rounded text-sm">️</button>
+                    <button onClick={() => permanentDelete(artist)} className="bg-red-800 px-3 py-1 rounded text-sm"></button>
                   </div>
                 </div>
               ))}
